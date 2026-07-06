@@ -153,6 +153,17 @@ tr.voided td{text-decoration:line-through;color:var(--muted)}
 .kpBtn:hover{background:var(--brandsoft);border-color:var(--brand)}
 .pinBtn{background:var(--bg);border:1px solid var(--line);color:var(--ink);padding:7px 9px;border-radius:6px;font-size:13px;font-weight:600}
 .pinBtn:hover{border-color:var(--brand);color:var(--brand)}
+#authGate{position:fixed;inset:0;z-index:100;background:linear-gradient(135deg,#0f9d8f,#0b6b74);display:none;align-items:center;justify-content:center}
+.authCard{background:#fff;border-radius:18px;padding:30px 28px;width:380px;max-width:92vw;box-shadow:0 24px 70px rgba(0,0,0,.35)}
+.authBrand{font-size:23px;font-weight:800;color:var(--brand);text-align:center}
+.authSub{text-align:center;color:var(--muted);font-size:14px;margin:4px 0 18px}
+#authGate input:not([type=checkbox]){width:100%;margin-bottom:12px;padding:12px;font-size:14px;border:1px solid var(--line);border-radius:9px;background:#fff}
+.authRemember{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-bottom:14px}
+.authBtn{width:100%;padding:13px;background:var(--accent);color:#fff;font-weight:700;font-size:15px;border-radius:10px}
+.authBtn:hover{filter:brightness(1.05)}
+.authSwitch{text-align:center;font-size:13px;color:var(--muted);margin-top:14px}
+.authSwitch a{color:var(--brand);font-weight:600;cursor:pointer;text-decoration:underline}
+.authError{background:#fde8e8;color:var(--danger);border-radius:8px;padding:9px 12px;font-size:13px;margin-bottom:14px}
 /* Tables */
 table{width:100%;border-collapse:collapse;font-size:14px}
 th,td{text-align:left;padding:10px 10px;border-bottom:1px solid var(--line)}
@@ -227,6 +238,27 @@ td.num,th.num{text-align:right}
 </style>
 </head>
 <body>
+<div id="authGate">
+  <div class="authCard">
+    <div class="authBrand">🍽️ Restaurant POS</div>
+    <div class="authSub" id="authSub">Sign in to your account</div>
+    <div id="authError" class="authError" style="display:none"></div>
+    <div id="loginForm">
+      <input id="li_email" placeholder="Email" autocomplete="off">
+      <input id="li_pass" type="password" placeholder="Password">
+      <label class="authRemember"><input type="checkbox" id="li_remember" checked> Keep me signed in</label>
+      <button class="authBtn" id="li_btn">Sign in</button>
+      <div class="authSwitch">No account yet? <a id="toRegister">Request one</a></div>
+    </div>
+    <div id="registerForm" style="display:none">
+      <input id="rg_email" placeholder="Your email" autocomplete="off">
+      <input id="rg_phone" placeholder="Phone (optional)">
+      <button class="authBtn" id="rg_btn">Request an account</button>
+      <div class="authSwitch" style="margin-top:10px">We'll review your request and email your login to that address.</div>
+      <div class="authSwitch">Already have an account? <a id="toLogin">Sign in</a></div>
+    </div>
+  </div>
+</div>
 <div class="app">
   <aside class="sidebar">
     <div class="brand"><span class="dot">🍽</span><span>POS</span></div>
@@ -240,6 +272,7 @@ td.num,th.num{text-align:right}
     </nav>
     <div class="sidefoot">
       <button class="langBtn" id="lockBtn">🔒 Lock</button>
+      <button class="langBtn" id="logoutBtn">↩ Log out</button>
       <button class="langBtn" id="langBtn">العربية</button>
     </div>
   </aside>
@@ -1050,7 +1083,66 @@ function refreshChrome(){
   renderCashierSel();applyLang();refreshActive();
 }
 function tickClock(){const d=new Date();document.getElementById('clock').innerHTML=d.toLocaleDateString(lang==='ar'?'ar-AE':'en-GB',{weekday:'short',day:'2-digit',month:'short'})+' · '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}
-renderPaytypeButtons();refreshChrome();tickClock();
+/* ===== Account sign-in / request gate (accounts controlled by you) ===== */
+const SESS_LS='pos_session';
+function _hash(s){let h=5381;for(let i=0;i<s.length;i++){h=(((h<<5)+h)+s.charCodeAt(i))>>>0;}return String(h);}
+window.mkpass=(p)=>{const h=_hash(String(p));console.log('Password hash for "'+p+'": '+h);return h;};
+/* Approved accounts — you control these.
+   To add a customer after they email you a request:
+     1) open this app, press F12, and in the Console type:  mkpass('theirPassword')
+     2) copy the number it prints
+     3) add a line to ACCOUNTS below:  {email:'their@email.com', pass:'THE_NUMBER'}
+     4) upload this index.html to your GitHub repo — their app will then accept that login.
+   To revoke access: delete their line and upload again. */
+const ACCOUNTS=[
+  {email:'lead@suncorpn.com', pass:_hash('suncorpn123')}
+  // ,{email:'customer@example.com', pass:'PASTE_HASH_HERE'}
+];
+function authError(m){const e=document.getElementById('authError');e.textContent=m||'';e.style.display=m?'block':'none';}
+function showAuth(which){
+  document.getElementById('loginForm').style.display=which==='login'?'block':'none';
+  document.getElementById('registerForm').style.display=which==='register'?'block':'none';
+  document.getElementById('authSub').textContent=which==='login'?'Sign in to your account':'Request a trial account';
+  authError('');
+}
+function enterApp(){document.getElementById('authGate').style.display='none';}
+function initAuth(){
+  try{const s=JSON.parse(localStorage.getItem(SESS_LS));if(s&&s.email&&ACCOUNTS.find(a=>a.email===s.email)){enterApp();return;}}catch(e){}
+  document.getElementById('authGate').style.display='flex';showAuth('login');
+}
+document.getElementById('toRegister').onclick=()=>showAuth('register');
+document.getElementById('toLogin').onclick=()=>showAuth('login');
+document.getElementById('li_btn').onclick=()=>{
+  const email=document.getElementById('li_email').value.trim().toLowerCase();
+  const pass=document.getElementById('li_pass').value;
+  const a=ACCOUNTS.find(x=>x.email===email);
+  if(!a||a.pass!==_hash(pass)){authError('Wrong email or password.');return;}
+  if(document.getElementById('li_remember').checked)localStorage.setItem(SESS_LS,JSON.stringify({email}));
+  enterApp();
+};
+const REQUEST_ENDPOINT='https://formspree.io/f/mwvdzkkn';
+document.getElementById('rg_btn').onclick=()=>{
+  const email=document.getElementById('rg_email').value.trim();
+  const phone=document.getElementById('rg_phone').value.trim();
+  if(!/^\S+@\S+\.\S+$/.test(email)){authError('Please enter a valid email.');return;}
+  authError('');
+  const btn=document.getElementById('rg_btn');btn.disabled=true;btn.textContent='Sending...';
+  const fd=new FormData();
+  fd.append('email',email);fd.append('phone',phone);
+  fd.append('_subject','Restaurant POS - trial account request');
+  fd.append('message','New trial account request from '+email+(phone?(', phone '+phone):''));
+  fetch(REQUEST_ENDPOINT,{method:'POST',headers:{'Accept':'application/json'},body:fd})
+    .then(r=>{if(!r.ok)throw new Error('bad');
+      document.getElementById('registerForm').innerHTML='<div style="text-align:center;color:var(--brand);font-weight:700;margin-bottom:10px">Request sent ✓</div><div class="authSwitch">Thanks! We received your request and will email your login to <b>'+email+'</b> soon.</div><div class="authSwitch"><a id="toLogin2">Back to sign in</a></div>';
+    })
+    .catch(()=>{
+      document.getElementById('registerForm').innerHTML='<div class="authSwitch">Could not send automatically. Please email us at <b>lead@suncorpn.com</b> with your email and phone, and we will set up your login.</div><div class="authSwitch"><a id="toLogin2">Back to sign in</a></div>';
+    })
+    .finally(()=>{const t=document.getElementById('toLogin2');if(t)t.onclick=()=>location.reload();});
+};
+document.getElementById('li_pass').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('li_btn').click();});
+document.getElementById('logoutBtn').onclick=()=>{localStorage.removeItem(SESS_LS);document.getElementById('li_email').value='';document.getElementById('li_pass').value='';document.getElementById('authGate').style.display='flex';showAuth('login');};
+renderPaytypeButtons();refreshChrome();tickClock();initAuth();
 setInterval(tickClock,10000);
 setInterval(()=>{if(activeView==='dash')renderDash();if(activeView==='kitchen')renderKDS();},20000);
 /* setup-hub build */
