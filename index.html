@@ -142,6 +142,12 @@ textarea{font-family:inherit;width:100%;background:#fff;border:1px solid var(--l
 .discPreset button{background:var(--brandsoft);color:var(--brand);border:1px solid var(--brand);padding:8px 12px;font-size:13px;font-weight:600;border-radius:8px}
 .voidBtn{background:transparent;color:var(--danger);border:none;font-size:15px;cursor:pointer}
 tr.voided td{text-decoration:line-through;color:var(--muted)}
+.roleRow{display:grid;grid-template-columns:1.5fr repeat(6,1fr) auto;gap:8px;align-items:center;margin-bottom:6px;font-size:12px}
+.roleRow input[type=text],.roleRow>input:not([type=checkbox]){font-size:13px;padding:6px 8px}
+.roleRow.roleHead{color:var(--muted);font-weight:700;font-size:11px;text-align:center}
+.roleRow.roleHead span:first-child{text-align:left}
+.roleRow input[type=checkbox]{justify-self:center;width:16px;height:16px}
+.roleRow button{background:var(--danger);color:#fff;padding:6px 9px;border-radius:6px;font-size:12px}
 /* Tables */
 table{width:100%;border-collapse:collapse;font-size:14px}
 th,td{text-align:left;padding:10px 10px;border-bottom:1px solid var(--line)}
@@ -228,6 +234,7 @@ td.num,th.num{text-align:right}
       <button data-view="settings"><span class="ic">⚙️</span><span data-i18n="nav_settings">Settings</span></button>
     </nav>
     <div class="sidefoot">
+      <button class="langBtn" id="lockBtn">🔒 Lock</button>
       <button class="langBtn" id="langBtn">العربية</button>
     </div>
   </aside>
@@ -425,8 +432,14 @@ const defaults={
   payTypes:[{name:'Cash',icon:'💵',on:true},{name:'Card',icon:'💳',on:true},{name:'Apple Pay',icon:'🍎',on:true},{name:'Google Pay',icon:'🅶',on:true},{name:'Samsung Pay',icon:'📱',on:true}],
   discounts:[{label:'Staff Meal 20%',type:'pct',value:20},{label:'Loyalty 10%',type:'pct',value:10},{label:'AED 5 Off',type:'amt',value:5}],
   reasons:['Customer changed mind','Wrong order','Item out of stock','Kitchen delay','Duplicate order'],
-  roles:['Admin','Manager','Cashier','Waiter','Delivery Boy'],
-  staff:[{name:'Dhruv',role:'Admin',pin:'1234'}],
+  roles:[
+    {name:'Admin',perms:{discount:true,void:true,reports:true,menu:true,setup:true,crm:true}},
+    {name:'Manager',perms:{discount:true,void:true,reports:true,menu:true,setup:true,crm:true}},
+    {name:'Supervisor',perms:{discount:true,void:true,reports:true,menu:false,setup:false,crm:true}},
+    {name:'Cashier',perms:{discount:false,void:false,reports:false,menu:false,setup:false,crm:true}},
+    {name:'Waiter',perms:{discount:false,void:false,reports:false,menu:false,setup:false,crm:true}}
+  ],
+  staff:[{name:'Manager',role:'Admin',pin:'1234'}],
   channels:[{name:'Talabat',commission:25},{name:'Deliveroo',commission:25},{name:'Zomato',commission:22},{name:'Careem',commission:20},{name:'Noon',commission:20}],
   menu:[
     {n:'Chicken Shawarma',na:'شاورما دجاج',c:'Main',p:18,s:40},{n:'Beef Burger',na:'برجر لحم',c:'Main',p:35,s:25},
@@ -440,10 +453,38 @@ const defaults={
   ],
   txns:[], held:[], kds:[], counter:1, heldSeq:1, kdsSeq:1
 };
+const PERMS=[['discount','Discount'],['void','Void'],['reports','Reports'],['menu','Menu/prices'],['setup','Setup'],['crm','Customers']];
+const DEFAULT_ROLE_PERMS={
+  Admin:{discount:1,void:1,reports:1,menu:1,setup:1,crm:1},
+  Manager:{discount:1,void:1,reports:1,menu:1,setup:1,crm:1},
+  Supervisor:{discount:1,void:1,reports:1,menu:0,setup:0,crm:1},
+  Cashier:{discount:0,void:0,reports:0,menu:0,setup:0,crm:1},
+  Waiter:{discount:0,void:0,reports:0,menu:0,setup:0,crm:1},
+  'Delivery Boy':{discount:0,void:0,reports:0,menu:0,setup:0,crm:1}
+};
+function roleFromName(n){const p=DEFAULT_ROLE_PERMS[n]||DEFAULT_ROLE_PERMS.Cashier;return {name:n,perms:{discount:!!p.discount,void:!!p.void,reports:!!p.reports,menu:!!p.menu,setup:!!p.setup,crm:!!p.crm}};}
+function roleObj(name){return (db.roles||[]).find(r=>r.name===name);}
+function roleHasPerm(name,key){const r=roleObj(name);return !!(r&&r.perms&&r.perms[key]);}
+let sessionUnlocked={};
+function requirePerm(key,onOk){
+  if(sessionUnlocked[key]){onOk();return;}
+  const anyPinned=(db.staff||[]).some(s=>s.pin);
+  if(!anyPinned){onOk();return;}
+  const label=(PERMS.find(p=>p[0]===key)||[key,key])[1];
+  const pin=prompt('Enter staff PIN to authorize: '+label);
+  if(pin===null)return;
+  const st=(db.staff||[]).find(s=>String(s.pin)===String(pin));
+  if(st&&roleHasPerm(st.role,key)){sessionUnlocked[key]=true;onOk();}
+  else alert('Not authorized for: '+label);
+}
 let db=load();
 function load(){try{const d=JSON.parse(localStorage.getItem(LS));if(d&&d.settings){d.held=d.held||[];d.kds=d.kds||[];d.heldSeq=d.heldSeq||1;d.kdsSeq=d.kdsSeq||1;
   d.payTypes=d.payTypes||JSON.parse(JSON.stringify(defaults.payTypes));d.discounts=d.discounts||JSON.parse(JSON.stringify(defaults.discounts));
-  d.reasons=d.reasons||defaults.reasons.slice();d.roles=d.roles||defaults.roles.slice();d.staff=d.staff||JSON.parse(JSON.stringify(defaults.staff));
+  d.reasons=d.reasons||defaults.reasons.slice();
+  d.roles=(d.roles&&d.roles.length)?d.roles:JSON.parse(JSON.stringify(defaults.roles));
+  if(typeof d.roles[0]==='string')d.roles=d.roles.map(roleFromName);
+  d.roles.forEach(r=>{if(!r.perms)r.perms=roleFromName(r.name).perms;});
+  d.staff=d.staff||JSON.parse(JSON.stringify(defaults.staff));
   d.channels=d.channels||JSON.parse(JSON.stringify(defaults.channels));if(d.settings.logo===undefined)d.settings.logo='';if(!d.settings.endOfDay)d.settings.endOfDay='12:00 AM';
   return d;}}catch(e){}return JSON.parse(JSON.stringify(defaults));}
 function save(){localStorage.setItem(LS,JSON.stringify(db));}
@@ -468,6 +509,7 @@ function applyLang(){
   document.getElementById('openOrdersBtn').textContent=T('open_orders')+' ('+db.held.length+')';
 }
 document.getElementById('langBtn').onclick=()=>{lang=lang==='en'?'ar':'en';db.settings.lang=lang;save();applyLang();refreshActive();};
+document.getElementById('lockBtn').onclick=()=>{sessionUnlocked={};alert('Locked. Reports, Setup, voids and manager discounts will ask for a PIN again.');};
 
 /* Menu */
 function cats(){return [...new Set(db.menu.map(m=>m.c))];}
@@ -592,8 +634,9 @@ document.getElementById('disc_cancel').onclick=()=>document.getElementById('disc
 document.getElementById('disc_remove').onclick=()=>{cur.discount=null;document.getElementById('discModal').classList.remove('show');renderOrder();};
 document.getElementById('disc_apply').onclick=()=>{
   const v=parseFloat(document.getElementById('discVal').value||0);
-  cur.discount=(!v||v<=0)?null:{type:discType,value:v};
-  document.getElementById('discModal').classList.remove('show');renderOrder();
+  const apply=()=>{cur.discount=(!v||v<=0)?null:{type:discType,value:v};document.getElementById('discModal').classList.remove('show');renderOrder();};
+  if(!v||v<=0){apply();return;}
+  requirePerm('discount',apply);
 };
 function resetOrder(){order=[];cur={type:'Dine-in',table:'',channel:'Talabat',custName:'',custPhone:'',note:'',discount:null};
   document.getElementById('otypes').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x.dataset.ot==='Dine-in'));renderOctx();renderOrder();updateActionBtns();}
@@ -782,8 +825,10 @@ function renderReports(){
 }
 window.reprint=function(inv){const t=db.txns.find(x=>x.inv===inv);if(t){buildReceipt(t);window.print();}};
 window.voidTxn=function(inv){const t=db.txns.find(x=>x.inv===inv);if(!t||t.void)return;
-  const reasons=db.reasons||[];const reason=reasons.length?prompt('Void reason ('+reasons.join(' / ')+'):',reasons[0]):prompt('Void reason:');
-  if(reason===null)return;t.void=true;t.voidReason=reason||'';save();renderReports();};
+  requirePerm('void',()=>{
+    const reasons=db.reasons||[];const reason=reasons.length?prompt('Void reason ('+reasons.join(' / ')+'):',reasons[0]):prompt('Void reason:');
+    if(reason===null)return;t.void=true;t.voidReason=reason||'';save();renderReports();
+  });};
 document.getElementById('repToday').onclick=()=>{repFilter='date';document.getElementById('repDate').value=todayStr();renderReports();};
 document.getElementById('repAll').onclick=()=>{repFilter='all';renderReports();};
 document.getElementById('repDate').onchange=()=>{repFilter='date';renderReports();};
@@ -886,14 +931,23 @@ function renderDiscEditor(){const w=document.getElementById('discEditor');w.inne
 function pStaff(b){
   b.innerHTML=`<div class="card"><h3 style="margin-bottom:10px">Roles</h3><div id="roleList" style="margin-bottom:8px"></div><div class="addRow"><button id="addRole">+ Add role</button></div></div><div class="card"><h3 style="margin-bottom:10px">Staff</h3><div class="mitem" style="grid-template-columns:2fr 1.4fr 1fr auto"><span class="mh">Name</span><span class="mh">Role</span><span class="mh">PIN</span><span></span></div><div id="staffEditor"></div><div class="addRow"><button id="addStaff">+ Add staff</button></div></div>`;
   renderRoleList();renderStaffEditor();
-  document.getElementById('addRole').onclick=()=>{const n=prompt('New role name');if(n){db.roles.push(n);save();renderRoleList();renderStaffEditor();}};
-  document.getElementById('addStaff').onclick=()=>{db.staff.push({name:'New',role:db.roles[0]||'Cashier',pin:'0000'});save();renderStaffEditor();renderCashierSel();};
+  document.getElementById('addRole').onclick=()=>{const n=prompt('New role name');if(n){db.roles.push(roleFromName(n));save();renderRoleList();renderStaffEditor();}};
+  document.getElementById('addStaff').onclick=()=>{db.staff.push({name:'New',role:(db.roles[0]&&db.roles[0].name)||'Cashier',pin:'0000'});save();renderStaffEditor();renderCashierSel();};
 }
-function renderRoleList(){const w=document.getElementById('roleList');w.innerHTML=db.roles.map((r,i)=>`<span class="chipTag">${esc(r)} <b data-del="${i}">✕</b></span>`).join(' ');
-  w.querySelectorAll('b[data-del]').forEach(x=>x.onclick=()=>{db.roles.splice(+x.dataset.del,1);save();renderRoleList();});}
+function renderRoleList(){
+  const w=document.getElementById('roleList');
+  const head='<div class="roleRow roleHead"><span>Role</span>'+PERMS.map(p=>`<span>${p[1]}</span>`).join('')+'<span></span></div>';
+  w.innerHTML=head+db.roles.map((r,i)=>{
+    const cells=PERMS.map(p=>`<input type="checkbox" data-i="${i}" data-k="${p[0]}" ${r.perms&&r.perms[p[0]]?'checked':''}>`).join('');
+    return `<div class="roleRow"><input value="${esc(r.name)}" data-i="${i}" data-name="1">${cells}<button data-del="${i}">✕</button></div>`;
+  }).join('');
+  w.querySelectorAll('input[data-name]').forEach(inp=>inp.onchange=()=>{const i=+inp.dataset.i,old=db.roles[i].name;db.roles[i].name=inp.value;db.staff.forEach(s=>{if(s.role===old)s.role=inp.value;});save();renderStaffEditor();renderCashierSel();});
+  w.querySelectorAll('input[type="checkbox"]').forEach(inp=>inp.onchange=()=>{const r=db.roles[+inp.dataset.i];r.perms=r.perms||{};r.perms[inp.dataset.k]=inp.checked;save();});
+  w.querySelectorAll('button[data-del]').forEach(x=>x.onclick=()=>{db.roles.splice(+x.dataset.del,1);save();renderRoleList();renderStaffEditor();});
+}
 function renderStaffEditor(){const w=document.getElementById('staffEditor');w.innerHTML='';
   db.staff.forEach((st,i)=>{const r=document.createElement('div');r.className='mitem';r.style.gridTemplateColumns='2fr 1.4fr 1fr auto';
-    const opts=db.roles.map(ro=>`<option ${ro===st.role?'selected':''}>${esc(ro)}</option>`).join('');
+    const opts=db.roles.map(ro=>`<option ${ro.name===st.role?'selected':''}>${esc(ro.name)}</option>`).join('');
     r.innerHTML=`<input value="${esc(st.name)}" data-i="${i}" data-k="name"><select data-i="${i}" data-k="role">${opts}</select><input value="${esc(st.pin)}" data-i="${i}" data-k="pin" maxlength="4"><button data-del="${i}">✕</button>`;w.appendChild(r);});
   w.querySelectorAll('input,select').forEach(inp=>inp.onchange=()=>{db.staff[+inp.dataset.i][inp.dataset.k]=inp.value;save();renderCashierSel();});
   w.querySelectorAll('button[data-del]').forEach(bt=>bt.onclick=()=>{db.staff.splice(+bt.dataset.del,1);save();renderStaffEditor();renderCashierSel();});}
@@ -927,9 +981,15 @@ function pLang(b){
 /* Nav */
 let activeView='dash';
 document.querySelectorAll('#snav button').forEach(b=>b.onclick=()=>{
-  document.querySelectorAll('#snav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  activeView=b.dataset.view;document.getElementById(activeView).classList.add('active');refreshActive();
+  const v=b.dataset.view;
+  const go=()=>{
+    document.querySelectorAll('#snav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');
+    document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+    activeView=v;document.getElementById(v).classList.add('active');refreshActive();
+  };
+  if(v==='reports')requirePerm('reports',go);
+  else if(v==='settings')requirePerm('setup',go);
+  else go();
 });
 function refreshActive(){
   if(activeView==='dash')renderDash();
