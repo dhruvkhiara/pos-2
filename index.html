@@ -939,6 +939,16 @@ document.getElementById('exportJson').onclick=()=>{
   download(JSON.stringify({generatedAt:new Date().toISOString(),count:out.length,invoices:out},null,2),'application/json','einvoices_'+(document.getElementById('repDate').value||'all')+'.json');
 };
 function download(data,type,name){const blob=new Blob([data],{type});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();}
+function csvq(s){s=String(s==null?'':s);return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
+function parseCSV(text){
+  const rows=[];let row=[],cur='',inq=false;text=String(text).replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  for(let i=0;i<text.length;i++){const ch=text[i];
+    if(inq){if(ch==='"'){if(text[i+1]==='"'){cur+='"';i++;}else inq=false;}else cur+=ch;}
+    else{if(ch==='"')inq=true;else if(ch===','){row.push(cur);cur='';}else if(ch==='\n'){row.push(cur);rows.push(row);row=[];cur='';}else cur+=ch;}
+  }
+  if(cur!==''||row.length){row.push(cur);rows.push(row);}
+  return rows.filter(r=>r.some(x=>String(x).trim()!==''));
+}
 /* ===== Setup hub ===== */
 let appCashier=(db.staff&&db.staff[0]?db.staff[0].name:'')||'';
 const SETUP_TILES=[
@@ -950,7 +960,8 @@ const SETUP_TILES=[
   {k:'staff',ic:'👥',label:{en:'Staff & Roles',ar:'الموظفون والصلاحيات'}},
   {k:'channels',ic:'🛵',label:{en:'Delivery Channels',ar:'منصات التوصيل'}},
   {k:'reasons',ic:'🗒️',label:{en:'Order Reasons',ar:'أسباب الإلغاء'}},
-  {k:'lang',ic:'🌐',label:{en:'Language',ar:'اللغة'}}
+  {k:'lang',ic:'🌐',label:{en:'Language',ar:'اللغة'}},
+  {k:'backup',ic:'💾',label:{en:'Backup & Restore',ar:'نسخ احتياطي'}}
 ];
 function loadSettings(){renderSetupHub();}
 function renderSetupHub(){
@@ -967,7 +978,7 @@ function openPanel(k){
   document.getElementById('setupHub').style.display='none';
   document.getElementById('setupPanel').style.display='';
   const t=SETUP_TILES.find(x=>x.k===k);document.getElementById('panelTitle').textContent=t.label[lang]||t.label.en;
-  ({profile:pProfile,taxes:pTaxes,menu:pMenu,pay:pPay,disc:pDisc,staff:pStaff,channels:pChan,reasons:pReasons,lang:pLang}[k])(document.getElementById('panelBody'));
+  ({profile:pProfile,taxes:pTaxes,menu:pMenu,pay:pPay,disc:pDisc,staff:pStaff,channels:pChan,reasons:pReasons,lang:pLang,backup:pBackup}[k])(document.getElementById('panelBody'));
 }
 document.getElementById('setupBack').onclick=renderSetupHub;
 function flash(){const m=document.getElementById('savedMsg');m.textContent='✓ Saved';setTimeout(()=>m.textContent='',1800);}
@@ -982,9 +993,47 @@ function pTaxes(b){const s=db.settings;
   document.getElementById('t_save').onclick=()=>{db.settings.vat=parseFloat(document.getElementById('t_vat').value||0);db.settings.service=parseFloat(document.getElementById('t_svc').value||0);db.settings.muni=parseFloat(document.getElementById('t_muni').value||0);saveAll();};
 }
 function pMenu(b){
-  b.innerHTML=`<div class="card"><div class="mitem"><span class="mh">Name (EN)</span><span class="mh">Name (AR)</span><span class="mh">Category</span><span class="mh">Price</span><span class="mh">Stock</span><span></span></div><div id="menuEditor"></div><div class="addRow"><button id="addMenuItem">+ Add item</button></div></div>`;
+  b.innerHTML=`<div class="card"><div class="mitem"><span class="mh">Name (EN)</span><span class="mh">Name (AR)</span><span class="mh">Category</span><span class="mh">Price</span><span class="mh">Stock</span><span></span></div><div id="menuEditor"></div><div class="addRow"><button id="addMenuItem">+ Add item</button></div></div>
+    <div class="card"><h3>Import / Export menu (CSV)</h3>
+    <p class="hint" style="margin-bottom:12px">Move your menu in or out as a spreadsheet — handy when switching from another system. Columns: <b>Name, Name (Arabic), Category, Price, Stock</b>. Export first to see the exact format.</p>
+    <button class="miniBtn" id="menuExport">⬇ Export menu to CSV</button>
+    <label class="miniBtn" style="cursor:pointer;display:inline-block">⬆ Import menu from CSV<input type="file" id="menuImport" accept=".csv,text/csv" style="display:none"></label></div>`;
   renderMenuEditor();
   document.getElementById('addMenuItem').onclick=()=>{db.menu.push({n:'New Item',na:'',c:cats()[0]||'Main',p:0,s:null});save();renderMenuEditor();};
+  document.getElementById('menuExport').onclick=()=>{
+    let csv='Name,Name (Arabic),Category,Price,Stock\n';
+    db.menu.forEach(m=>{csv+=[csvq(m.n),csvq(m.na||''),csvq(m.c),m.p,(m.s==null?'':m.s)].join(',')+'\n';});
+    download(csv,'text/csv','menu.csv');
+  };
+  document.getElementById('menuImport').onchange=(e)=>{
+    const f=e.target.files[0];if(!f)return;const rd=new FileReader();
+    rd.onload=()=>{
+      const rows=parseCSV(rd.result);if(!rows.length){alert('That file has no rows.');return;}
+      let start=0;const h=rows[0].map(x=>String(x).toLowerCase());
+      let iN=0,iA=1,iC=2,iP=3,iS=4;
+      if(h.some(x=>x.includes('name')||x.includes('price')||x.includes('categ'))){
+        start=1;
+        iN=h.findIndex(x=>x.includes('name')&&!x.includes('arab'));
+        iA=h.findIndex(x=>x.includes('arab'));
+        iC=h.findIndex(x=>x.includes('categ'));
+        iP=h.findIndex(x=>x.includes('price'));
+        iS=h.findIndex(x=>x.includes('stock'));
+      }
+      const g=(r,i)=>(i>=0&&r[i]!=null)?String(r[i]).trim():'';
+      const items=[];
+      for(let k=start;k<rows.length;k++){const r=rows[k];const nm=g(r,iN>=0?iN:0);if(!nm)continue;
+        const st=g(r,iS);
+        items.push({n:nm,na:g(r,iA),c:g(r,iC)||'Main',p:parseFloat(g(r,iP))||0,s:(st===''?null:(isNaN(parseInt(st))?null:parseInt(st)))});
+      }
+      if(!items.length){alert('Could not find any menu items. Make sure there are Name, Category and Price columns.');return;}
+      const replace=confirm(items.length+' items found.\n\nOK = REPLACE your current menu with these.\nCancel = ADD them to your current menu.');
+      db.menu=replace?items:db.menu.concat(items);
+      save();renderMenuEditor();renderCats&&renderCats();renderGrid&&renderGrid();
+      alert('Menu imported: '+items.length+' items.');
+      document.getElementById('menuImport').value='';
+    };
+    rd.readAsText(f);
+  };
 }
 function renderMenuEditor(){
   const w=document.getElementById('menuEditor');if(!w)return;w.innerHTML='';
@@ -1065,6 +1114,32 @@ function pLang(b){
   b.innerHTML=`<div class="card"><p class="hint" style="margin-bottom:12px">Default interface language. You can also toggle from the sidebar.</p><div class="ptoggle" style="max-width:320px"><button id="lang_en" class="${lang==='en'?'active':''}">English</button><button id="lang_ar" class="${lang==='ar'?'active':''}">العربية</button></div></div>`;
   document.getElementById('lang_en').onclick=()=>{lang='en';db.settings.lang='en';save();applyLang();openPanel('lang');};
   document.getElementById('lang_ar').onclick=()=>{lang='ar';db.settings.lang='ar';save();applyLang();openPanel('lang');};
+}
+function pBackup(b){
+  const raw=localStorage.getItem(LS)||'{}';let info='';
+  try{const x=JSON.parse(raw);info=(x.menu?x.menu.length:0)+' menu items · '+(x.txns?x.txns.length:0)+' sales';}catch(e){}
+  const last=localStorage.getItem('pos_last_backup');
+  b.innerHTML=`<div class="card"><h3>💾 Download a backup</h3>
+    <p class="hint" style="margin-bottom:12px">Your menu, sales, settings and staff are stored on this computer only. Download a backup regularly so you never lose them.<br>Current data: <b>${info}</b>.${last?('<br>Last backup: '+new Date(last).toLocaleString('en-GB')):''}</p>
+    <button class="saveBtn" id="bk_export">⬇ Download backup file</button></div>
+    <div class="card"><h3>♻ Restore from a backup</h3>
+    <p class="hint" style="margin-bottom:10px">Load a backup file to bring your data onto a new computer, or recover after a reset.</p>
+    <input type="file" id="bk_file" accept="application/json,.json">
+    <div style="color:var(--danger);font-size:12px;margin-top:10px">⚠ This replaces ALL data on this computer with the backup.</div></div>`;
+  document.getElementById('bk_export').onclick=()=>{
+    const data=localStorage.getItem(LS)||'{}';const d=new Date();
+    download(data,'application/json','pos-backup-'+d.toISOString().slice(0,10)+'.json');
+    localStorage.setItem('pos_last_backup',d.toISOString());flash();openPanel('backup');
+  };
+  document.getElementById('bk_file').onchange=(e)=>{
+    const f=e.target.files[0];if(!f)return;const rd=new FileReader();
+    rd.onload=()=>{try{const x=JSON.parse(rd.result);
+      if(!x||!x.settings){alert('That does not look like a valid POS backup file.');return;}
+      if(!confirm('Replace ALL data on this computer with this backup? This cannot be undone.'))return;
+      localStorage.setItem(LS,JSON.stringify(x));alert('Backup restored. The app will now reload.');location.reload();
+    }catch(err){alert('Could not read that file — it may be corrupted or not a backup.');}};
+    rd.readAsText(f);
+  };
 }
 /* Nav */
 let activeView='dash';
