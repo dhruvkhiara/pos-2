@@ -247,9 +247,8 @@ td.num,th.num{text-align:right}
     <div id="loginForm">
       <input id="li_email" placeholder="Email" autocomplete="off">
       <input id="li_pass" type="password" placeholder="Password">
-      <label class="authRemember"><input type="checkbox" id="li_remember" checked> Keep me signed in</label>
       <button class="authBtn" id="li_btn">Sign in</button>
-      <div class="authSwitch">No account yet? <a id="toRegister">Request one</a></div>
+      <div class="authSwitch">No account yet? <a id="toRegister">Create one</a></div>
     </div>
     <div id="registerForm" style="display:none">
       <input id="rg_email" placeholder="Your email" autocomplete="off">
@@ -1133,17 +1132,9 @@ function grantAccess(email,createdAt,unlimited){
   if(!unlimited&&trialLeft()<=0){showTrialEnded();return;}
   enterApp();updateTrialBadge();
 }
-async function initAuth(){
+function initAuth(){
+  localStorage.removeItem(SESS_LS);
   document.getElementById('authGate').style.display='flex';showAuth('login');
-  let s=null;try{s=JSON.parse(localStorage.getItem(SESS_LS));}catch(e){}
-  if(s&&s.type==='master'){grantAccess(s.email,null,true);return;}
-  if(s&&s.type==='sb'&&s.refresh_token){
-    try{
-      const res=await sbPost('token?grant_type=refresh_token',{refresh_token:s.refresh_token});
-      if(res.ok){const u=res.data.user||{};const createdAt=u.created_at||s.createdAt;localStorage.setItem(SESS_LS,JSON.stringify({type:'sb',refresh_token:res.data.refresh_token,email:s.email,createdAt:createdAt}));grantAccess(s.email,createdAt,isUnlimited(s.email));}
-      else{localStorage.removeItem(SESS_LS);}
-    }catch(e){if(s.createdAt){grantAccess(s.email,s.createdAt,isUnlimited(s.email));}}
-  }
 }
 document.getElementById('toRegister').onclick=()=>showAuth('register');
 document.getElementById('toLogin').onclick=()=>showAuth('login');
@@ -1152,13 +1143,12 @@ document.getElementById('li_btn').onclick=async ()=>{
   const pass=document.getElementById('li_pass').value;
   if(!email||!pass){authError('Enter your email and password.');return;}
   const m=MASTER_ACCOUNTS.find(a=>a.email===email);
-  if(m&&m.pass===_hash(pass)){if(document.getElementById('li_remember').checked)localStorage.setItem(SESS_LS,JSON.stringify({type:'master',email:email}));grantAccess(email,null,true);return;}
+  if(m&&m.pass===_hash(pass)){grantAccess(email,null,true);return;}
   const btn=document.getElementById('li_btn');btn.disabled=true;btn.textContent='Signing in...';
   try{
     const res=await sbPost('token?grant_type=password',{email:email,password:pass});
     if(!res.ok){authError(res.data.error_description||res.data.msg||'Wrong email or password.');return;}
     const u=res.data.user||{};const createdAt=u.created_at||new Date().toISOString();
-    if(document.getElementById('li_remember').checked)localStorage.setItem(SESS_LS,JSON.stringify({type:'sb',refresh_token:res.data.refresh_token,email:email,createdAt:createdAt}));
     grantAccess(email,createdAt,isUnlimited(email));
   }catch(e){authError('No internet connection — please connect and try again.');}
   finally{btn.disabled=false;btn.textContent='Sign in';}
@@ -1175,7 +1165,6 @@ document.getElementById('rg_btn').onclick=async ()=>{
     if(!res.ok){authError(res.data.msg||res.data.error_description||'Could not create account.');return;}
     if(res.data.access_token){
       const u=res.data.user||{};const createdAt=u.created_at||new Date().toISOString();
-      localStorage.setItem(SESS_LS,JSON.stringify({type:'sb',refresh_token:res.data.refresh_token,email:email,createdAt:createdAt}));
       grantAccess(email,createdAt,isUnlimited(email));
     }else{
       document.getElementById('registerForm').innerHTML='<div style="text-align:center;color:var(--brand);font-weight:700;margin-bottom:10px">Account created ✓</div><div class="authSwitch">Please check your email (<b>'+email+'</b>) to confirm your account, then sign in.</div><div class="authSwitch"><a id="toLogin2">Go to sign in</a></div>';
@@ -1194,8 +1183,6 @@ setInterval(tickClock,10000);
 setInterval(()=>{if(activeView==='dash')renderDash();if(activeView==='kitchen')renderKDS();},20000);
 setInterval(()=>{if(currentUser&&!currentUser.unlimited){if(trialLeft()<=0)showTrialEnded();else updateTrialBadge();}},60000);
 /* setup-hub build */
-  window.addEventListener('beforeunload',function()
-{try{localStorage.removeItem('pos_session');}catch(e){}});
 </script>
 </body>
 </html>
