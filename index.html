@@ -153,7 +153,8 @@ tr.voided td{text-decoration:line-through;color:var(--muted)}
 .kpBtn:hover{background:var(--brandsoft);border-color:var(--brand)}
 .pinBtn{background:var(--bg);border:1px solid var(--line);color:var(--ink);padding:7px 9px;border-radius:6px;font-size:13px;font-weight:600}
 .pinBtn:hover{border-color:var(--brand);color:var(--brand)}
-#authGate{position:fixed;inset:0;z-index:100;background:linear-gradient(135deg,#0f9d8f,#0b6b74);display:none;align-items:center;justify-content:center}
+#authGate,#trialGate{position:fixed;inset:0;z-index:100;background:linear-gradient(135deg,#0f9d8f,#0b6b74);display:none;align-items:center;justify-content:center}
+.trialBadge{font-size:12px;font-weight:700;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:4px 10px}
 .authCard{background:#fff;border-radius:18px;padding:30px 28px;width:380px;max-width:92vw;box-shadow:0 24px 70px rgba(0,0,0,.35)}
 .authBrand{font-size:23px;font-weight:800;color:var(--brand);text-align:center}
 .authSub{text-align:center;color:var(--muted);font-size:14px;margin:4px 0 18px}
@@ -259,6 +260,15 @@ td.num,th.num{text-align:right}
     </div>
   </div>
 </div>
+<div id="trialGate">
+  <div class="authCard">
+    <div class="authBrand">🍽️ Restaurant POS</div>
+    <div class="authSub">Free trial ended</div>
+    <div style="text-align:center;color:var(--ink);font-size:14px;margin:12px 0 18px;line-height:1.5">Your 48-hour free trial has ended. To keep using the POS, please contact us to activate your subscription.</div>
+    <button class="authBtn" id="trialEmailBtn">Email lead@suncorpn.com to subscribe</button>
+    <div class="authSwitch"><a id="trialSwitch">Sign in with another account</a></div>
+  </div>
+</div>
 <div class="app">
   <aside class="sidebar">
     <div class="brand"><span class="dot">🍽</span><span>POS</span></div>
@@ -281,6 +291,7 @@ td.num,th.num{text-align:right}
       <h1 id="appTitle">Restaurant POS</h1>
       <span class="biz" id="bizLabel"></span>
       <select class="cashierSel" id="cashierSel" title="Cashier on shift" style="margin-left:auto"></select>
+      <span class="trialBadge" id="trialBadge" style="display:none;margin-right:12px"></span>
       <div class="clock" id="clock"></div>
     </header>
     <div class="views">
@@ -1094,9 +1105,14 @@ window.mkpass=(p)=>{const h=_hash(String(p));console.log('Password hash for "'+p
      3) add a line to ACCOUNTS below:  {email:'their@email.com', pass:'THE_NUMBER'}
      4) upload this index.html to your GitHub repo — their app will then accept that login.
    To revoke access: delete their line and upload again. */
+const TRIAL_HOURS=48;
 const ACCOUNTS=[
-  {email:'lead@suncorpn.com', pass:_hash('suncorpn123')}
+  // Your master login — never expires:
+  {email:'lead@suncorpn.com', pass:_hash('suncorpn123'), unlimited:true}
+  // Trial customer (locks 48h after their first login):
   // ,{email:'customer@example.com', pass:'PASTE_HASH_HERE'}
+  // Paid customer (no expiry) — add unlimited:true when they pay:
+  // ,{email:'paid@example.com', pass:'PASTE_HASH_HERE', unlimited:true}
 ];
 function authError(m){const e=document.getElementById('authError');e.textContent=m||'';e.style.display=m?'block':'none';}
 function showAuth(which){
@@ -1105,9 +1121,35 @@ function showAuth(which){
   document.getElementById('authSub').textContent=which==='login'?'Sign in to your account':'Request a trial account';
   authError('');
 }
-function enterApp(){document.getElementById('authGate').style.display='none';}
+function enterApp(){document.getElementById('authGate').style.display='none';document.getElementById('trialGate').style.display='none';}
+let currentUser='';
+function acctOf(email){return ACCOUNTS.find(a=>a.email===email);}
+function trialInfo(email){
+  const a=acctOf(email);if(!a)return{expired:false};
+  if(a.unlimited)return{unlimited:true,expired:false};
+  const hours=a.trialHours||TRIAL_HOURS;const key='pos_trialstart_'+email;
+  let start=localStorage.getItem(key);
+  if(!start){start=String(Date.now());localStorage.setItem(key,start);}
+  const left=(parseInt(start)+hours*3600000)-Date.now();
+  return{unlimited:false,expired:left<=0,left:left,hours:hours};
+}
+function fmtLeft(ms){if(ms<=0)return'0';const h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000);return h>=24?(Math.floor(h/24)+'d '+(h%24)+'h'):(h+'h '+m+'m');}
+function updateTrialBadge(){
+  const b=document.getElementById('trialBadge');if(!b)return;
+  if(!currentUser){b.style.display='none';return;}
+  const t=trialInfo(currentUser);
+  if(t.unlimited){b.style.display='none';return;}
+  b.style.display='inline-block';b.textContent='⏳ Trial: '+fmtLeft(t.left)+' left';
+  b.style.color=t.left<6*3600000?'#b9761b':'var(--muted)';
+}
+function showTrialEnded(){currentUser='';document.getElementById('authGate').style.display='none';document.getElementById('trialGate').style.display='flex';}
+function authSuccess(email){
+  const t=trialInfo(email);
+  if(t.expired){showTrialEnded();return;}
+  currentUser=email;enterApp();updateTrialBadge();
+}
 function initAuth(){
-  try{const s=JSON.parse(localStorage.getItem(SESS_LS));if(s&&s.email&&ACCOUNTS.find(a=>a.email===s.email)){enterApp();return;}}catch(e){}
+  try{const s=JSON.parse(localStorage.getItem(SESS_LS));if(s&&s.email&&ACCOUNTS.find(a=>a.email===s.email)){authSuccess(s.email);return;}}catch(e){}
   document.getElementById('authGate').style.display='flex';showAuth('login');
 }
 document.getElementById('toRegister').onclick=()=>showAuth('register');
@@ -1118,7 +1160,7 @@ document.getElementById('li_btn').onclick=()=>{
   const a=ACCOUNTS.find(x=>x.email===email);
   if(!a||a.pass!==_hash(pass)){authError('Wrong email or password.');return;}
   if(document.getElementById('li_remember').checked)localStorage.setItem(SESS_LS,JSON.stringify({email}));
-  enterApp();
+  authSuccess(email);
 };
 const REQUEST_ENDPOINT='https://formspree.io/f/mwvdzkkn';
 document.getElementById('rg_btn').onclick=()=>{
@@ -1141,10 +1183,13 @@ document.getElementById('rg_btn').onclick=()=>{
     .finally(()=>{const t=document.getElementById('toLogin2');if(t)t.onclick=()=>location.reload();});
 };
 document.getElementById('li_pass').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('li_btn').click();});
-document.getElementById('logoutBtn').onclick=()=>{localStorage.removeItem(SESS_LS);document.getElementById('li_email').value='';document.getElementById('li_pass').value='';document.getElementById('authGate').style.display='flex';showAuth('login');};
+document.getElementById('logoutBtn').onclick=()=>{currentUser='';localStorage.removeItem(SESS_LS);document.getElementById('li_email').value='';document.getElementById('li_pass').value='';document.getElementById('trialGate').style.display='none';document.getElementById('authGate').style.display='flex';showAuth('login');};
+document.getElementById('trialEmailBtn').onclick=()=>window.open('mailto:lead@suncorpn.com?subject='+encodeURIComponent('Subscribe - Restaurant POS'));
+document.getElementById('trialSwitch').onclick=()=>{localStorage.removeItem(SESS_LS);document.getElementById('trialGate').style.display='none';document.getElementById('authGate').style.display='flex';document.getElementById('li_email').value='';document.getElementById('li_pass').value='';showAuth('login');};
 renderPaytypeButtons();refreshChrome();tickClock();initAuth();
 setInterval(tickClock,10000);
 setInterval(()=>{if(activeView==='dash')renderDash();if(activeView==='kitchen')renderKDS();},20000);
+setInterval(()=>{if(currentUser){const t=trialInfo(currentUser);if(t.expired)showTrialEnded();else updateTrialBadge();}},60000);
 /* setup-hub build */
 </script>
 </body>
