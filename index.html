@@ -148,6 +148,11 @@ tr.voided td{text-decoration:line-through;color:var(--muted)}
 .roleRow.roleHead span:first-child{text-align:left}
 .roleRow input[type=checkbox]{justify-self:center;width:16px;height:16px}
 .roleRow button{background:var(--danger);color:#fff;padding:6px 9px;border-radius:6px;font-size:12px}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.kpBtn{background:var(--bg);border:1px solid var(--line);color:var(--ink);font-size:20px;font-weight:700;padding:15px 0;border-radius:10px}
+.kpBtn:hover{background:var(--brandsoft);border-color:var(--brand)}
+.pinBtn{background:var(--bg);border:1px solid var(--line);color:var(--ink);padding:7px 9px;border-radius:6px;font-size:13px;font-weight:600}
+.pinBtn:hover{border-color:var(--brand);color:var(--brand)}
 /* Tables */
 table{width:100%;border-collapse:collapse;font-size:14px}
 th,td{text-align:left;padding:10px 10px;border-bottom:1px solid var(--line)}
@@ -402,7 +407,8 @@ td.num,th.num{text-align:right}
 </div></div>
 <div class="overlay" id="askModal"><div class="modal">
   <h3 id="askTitle">Enter</h3>
-  <div class="field"><input id="askInput" autocomplete="off"></div>
+  <div class="field"><input id="askInput" autocomplete="off" style="text-align:center;font-size:20px;letter-spacing:4px"></div>
+  <div class="keypad" id="askKeypad" style="display:none"></div>
   <div class="acts"><button class="btn-cancel" id="askCancel">Cancel</button><button class="btn-ok" id="askOk">OK</button></div>
 </div></div>
 <div id="receipt"><div class="rc" id="rcBody"></div></div>
@@ -484,7 +490,7 @@ function requirePerm(key,onOk){
     const st=(db.staff||[]).find(s=>String(s.pin)===String(pin));
     if(st&&roleHasPerm(st.role,key)){sessionUnlocked[key]=true;onOk();}
     else alert('Not authorized for: '+label);
-  },{password:true});
+  },{password:true,keypad:true,maxlen:4});
 }
 let db=load();
 function load(){try{const d=JSON.parse(localStorage.getItem(LS));if(d&&d.settings){d.held=d.held||[];d.kds=d.kds||[];d.heldSeq=d.heldSeq||1;d.kdsSeq=d.kdsSeq||1;
@@ -520,12 +526,25 @@ function applyLang(){
 document.getElementById('langBtn').onclick=()=>{lang=lang==='en'?'ar':'en';db.settings.lang=lang;save();applyLang();refreshActive();};
 document.getElementById('lockBtn').onclick=()=>{sessionUnlocked={};alert('Locked. Reports, Setup, voids and manager discounts will ask for a PIN again.');};
 // In-app replacement for prompt() (Electron does not support window.prompt)
-let _askCb=null;
+let _askCb=null,_askMax=99;
+function buildKeypad(){
+  const kp=document.getElementById('askKeypad');if(kp.dataset.built)return;kp.dataset.built='1';
+  ['1','2','3','4','5','6','7','8','9','C','0','⌫'].forEach(k=>{
+    const b=document.createElement('button');b.type='button';b.className='kpBtn';b.textContent=k;
+    b.onclick=()=>{const inp=document.getElementById('askInput');
+      if(k==='C')inp.value='';
+      else if(k==='⌫')inp.value=inp.value.slice(0,-1);
+      else if(inp.value.length<_askMax)inp.value+=k;};
+    kp.appendChild(b);
+  });
+}
 function askText(title,cb,opts){
-  opts=opts||{};
+  opts=opts||{};buildKeypad();
   document.getElementById('askTitle').textContent=title;
   const inp=document.getElementById('askInput');
   inp.value=opts.value||'';inp.type=opts.password?'password':'text';
+  _askMax=opts.maxlen||99;
+  document.getElementById('askKeypad').style.display=opts.keypad?'grid':'none';
   _askCb=cb;document.getElementById('askModal').classList.add('show');
   setTimeout(()=>{inp.focus();inp.select();},50);
 }
@@ -973,8 +992,9 @@ function renderRoleList(){
 function renderStaffEditor(){const w=document.getElementById('staffEditor');w.innerHTML='';
   db.staff.forEach((st,i)=>{const r=document.createElement('div');r.className='mitem';r.style.gridTemplateColumns='2fr 1.4fr 1fr auto';
     const opts=db.roles.map(ro=>`<option ${ro.name===st.role?'selected':''}>${esc(ro.name)}</option>`).join('');
-    r.innerHTML=`<input value="${esc(st.name)}" data-i="${i}" data-k="name"><select data-i="${i}" data-k="role">${opts}</select><input value="${esc(st.pin)}" data-i="${i}" data-k="pin" maxlength="4"><button data-del="${i}">✕</button>`;w.appendChild(r);});
+    r.innerHTML=`<input value="${esc(st.name)}" data-i="${i}" data-k="name"><select data-i="${i}" data-k="role">${opts}</select><button class="pinBtn" data-pin="${i}">${st.pin?'PIN '+'•'.repeat(String(st.pin).length):'Set PIN'}</button><button data-del="${i}">✕</button>`;w.appendChild(r);});
   w.querySelectorAll('input,select').forEach(inp=>inp.onchange=()=>{db.staff[+inp.dataset.i][inp.dataset.k]=inp.value;save();renderCashierSel();});
+  w.querySelectorAll('.pinBtn').forEach(b=>b.onclick=()=>{const i=+b.dataset.pin;askText('Set 4-digit PIN for '+(db.staff[i].name||'staff'),(v)=>{if(v===null)return;db.staff[i].pin=v;save();renderStaffEditor();renderCashierSel();},{keypad:true,maxlen:4});});
   w.querySelectorAll('button[data-del]').forEach(bt=>bt.onclick=()=>{db.staff.splice(+bt.dataset.del,1);save();renderStaffEditor();renderCashierSel();});}
 function renderCashierSel(){const sel=document.getElementById('cashierSel');if(!sel)return;
   if(!db.staff.find(s=>s.name===appCashier))appCashier=(db.staff[0]||{}).name||'';
