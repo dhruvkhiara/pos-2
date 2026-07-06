@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Restaurant POS</title>
+<style>
+:root{
+  --bg:#eef1f6; --card:#ffffff; --ink:#1e2733; --muted:#6b7789; --line:#e5e9f0;
+  --brand:#0f9d8f; --brand2:#12b3a3; --brandsoft:#e6f7f4; --accent:#0e9f6e; --amber:#e8a13a;
+  --blue:#3b82f6; --purple:#7c67e6; --danger:#e5484d; --chip:#0ea5e9;
+  --tal:#ff5a00; --del:#00ccbc; --zom:#e23744; --car:#4bb543; --noon:#feee00;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,'Noto Sans Arabic',Arial,sans-serif;background:var(--bg);color:var(--ink);height:100vh;overflow:hidden}
+button{font-family:inherit;cursor:pointer;border:none;border-radius:8px}
+input,select{font-family:inherit;background:#fff;border:1px solid var(--line);color:var(--ink);padding:9px 11px;border-radius:8px;font-size:14px}
+input:focus,select:focus{outline:none;border-color:var(--brand)}
+.app{display:flex;height:100vh}
+/* Sidebar */
+.sidebar{width:212px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;padding:16px 12px}
+.brand{display:flex;align-items:center;gap:10px;padding:6px 8px 16px;font-weight:800;font-size:18px;color:var(--brand)}
+.brand .dot{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--brand),var(--brand2));display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px}
+.snav{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.snav button{display:flex;align-items:center;gap:11px;background:transparent;color:var(--muted);padding:11px 12px;font-size:14.5px;font-weight:600;border-radius:10px;text-align:left;width:100%}
+.snav button .ic{font-size:17px;width:20px;text-align:center}
+.snav button:hover{background:var(--bg)}
+.snav button.active{background:var(--brandsoft);color:var(--brand)}
+.sidefoot{margin-top:auto;display:flex;flex-direction:column;gap:8px}
+.langBtn{background:var(--bg);color:var(--ink);border:1px solid var(--line);padding:10px;font-weight:600;font-size:13px}
+/* Main */
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{height:60px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 22px;gap:14px}
+.topbar h1{font-size:17px;font-weight:700}
+.topbar .biz{color:var(--muted);font-size:13px}
+.topbar .clock{margin-left:auto;color:var(--muted);font-size:13px;text-align:right}
+.views{flex:1;min-height:0;position:relative}
+.view{position:absolute;inset:0;display:none}
+.view.active{display:flex}
+.pane{flex:1;overflow-y:auto;padding:22px 24px}
+.pane h2{font-size:19px;margin-bottom:3px}
+.pane .sub{color:var(--muted);font-size:13.5px;margin-bottom:18px}
+/* Cards / dashboard */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:18px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.kpi .lbl{color:var(--muted);font-size:13px;display:flex;align-items:center;gap:7px}
+.kpi .val{font-size:26px;font-weight:800;margin-top:6px}
+.kpi .val.small{font-size:20px}
+.dashgrid{display:grid;grid-template-columns:1.2fr 1fr;gap:16px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+.card h3{font-size:15px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.bar{display:flex;align-items:center;gap:10px;margin-bottom:11px;font-size:13.5px}
+.bar .bl{width:120px;color:var(--ink);display:flex;align-items:center;gap:7px}
+.bar .bt{flex:1;height:10px;background:var(--bg);border-radius:6px;overflow:hidden}
+.bar .bf{height:100%;border-radius:6px;background:var(--brand)}
+.bar .bv{width:96px;text-align:right;color:var(--muted)}
+.chdot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.feed{display:flex;flex-direction:column}
+.feedrow{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line);font-size:13.5px}
+.feedrow:last-child{border-bottom:none}
+.feedrow .fi{flex:1}
+.feedrow .fi small{color:var(--muted);display:block;font-size:12px}
+.feedrow .fa{font-weight:700}
+.pill{font-size:11px;padding:2px 9px;border-radius:20px;background:var(--bg);color:var(--muted);font-weight:600}
+.empty{color:var(--muted);text-align:center;padding:34px 20px;font-size:14px}
+/* Register */
+#pos{flex-direction:row}
+.menuArea{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+.lowbar{background:#fff6e8;color:#b9761b;font-size:13px;padding:8px 18px;border-bottom:1px solid var(--line);display:none}
+.lowbar.show{display:block}
+.cats{display:flex;gap:8px;padding:14px 18px;overflow-x:auto;background:#fff;border-bottom:1px solid var(--line)}
+.cat{background:#fff;color:var(--muted);padding:8px 16px;border-radius:22px;white-space:nowrap;font-size:14px;border:1px solid var(--line);font-weight:600}
+.cat.active{background:var(--brand);border-color:var(--brand);color:#fff}
+.grid{flex:1;overflow-y:auto;padding:16px 18px;display:grid;grid-template-columns:repeat(auto-fill,minmax(146px,1fr));gap:12px;align-content:start}
+.item{position:relative;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 13px;text-align:left;display:flex;flex-direction:column;gap:4px;min-height:98px;transition:.1s;box-shadow:0 1px 2px rgba(20,30,50,.03)}
+.item:hover{border-color:var(--brand);transform:translateY(-2px);box-shadow:0 6px 16px rgba(15,157,143,.12)}
+.item.out{opacity:.5}
+.item .nm{font-size:14px;font-weight:700;line-height:1.25;color:var(--ink)}
+.item .nmar{font-size:12px;color:var(--muted);line-height:1.2}
+.item .pr{margin-top:auto;color:var(--brand);font-weight:800;font-size:15px}
+.stockBadge{position:absolute;top:8px;right:8px;font-size:11px;padding:2px 7px;border-radius:10px;background:var(--bg);color:var(--muted);font-weight:600}
+.stockBadge.low{background:#fff2df;color:#b9761b}
+.stockBadge.zero{background:#fde8e8;color:var(--danger)}
+.order{width:400px;background:#fff;border-left:1px solid var(--line);display:flex;flex-direction:column}
+.order .head{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
+.headTop{display:flex;align-items:center;gap:10px}
+.headTop .ttl{font-weight:700;font-size:15px}
+.openBtn{margin-left:auto;background:var(--bg);color:var(--ink);border:1px solid var(--line);font-size:12px;padding:7px 11px;font-weight:600}
+.otypes{display:flex;gap:6px}
+.otypes button{flex:1;background:var(--bg);color:var(--muted);border:1px solid var(--line);padding:9px 4px;font-size:13px;font-weight:700}
+.otypes button.active{background:var(--brand);border-color:var(--brand);color:#fff}
+.octxFields{display:flex;gap:8px}
+.octxFields input,.octxFields select{flex:1;font-size:13px;padding:8px 9px}
+.lines{flex:1;overflow-y:auto;padding:8px 14px}
+.line{display:flex;align-items:center;gap:8px;padding:9px 2px;border-bottom:1px solid var(--line)}
+.line .lnm{flex:1;font-size:14px;font-weight:600}
+.line .lnm small{color:var(--muted);display:block;font-size:12px;font-weight:400}
+.qtybox{display:flex;align-items:center;gap:7px}
+.qtybox button{width:27px;height:27px;background:var(--bg);color:var(--ink);font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;border:1px solid var(--line)}
+.qtybox span{min-width:20px;text-align:center;font-size:14px;font-weight:600}
+.line .lt{min-width:66px;text-align:right;font-weight:700;font-size:14px}
+.line .del{background:transparent;color:var(--danger);font-size:16px;padding:2px 4px}
+.totals{border-top:1px solid var(--line);padding:12px 16px;font-size:14px;background:#fff}
+.totals .row{display:flex;justify-content:space-between;padding:3px 0;color:var(--muted)}
+.totals .row.grand{color:var(--ink);font-size:21px;font-weight:800;border-top:1px solid var(--line);margin-top:6px;padding-top:10px}
+.payrow2{display:flex;gap:8px;padding:10px 16px 10px}
+.payrow2 button{flex:1;padding:11px 4px;font-size:14px;font-weight:700;color:#fff}
+.btn-kot{background:var(--blue)}
+.btn-hold{background:var(--amber)}
+.btn-clear{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.payrow{display:flex;gap:8px;padding:6px 16px 16px}
+.payrow button{flex:1;padding:15px;font-size:16px;font-weight:800;color:#fff;background:var(--accent)}
+.payrow button:hover{filter:brightness(1.05)}
+.menusearch{padding:12px 18px 0;background:#fff}
+.menusearch input{width:100%}
+.lineHead{display:flex;padding:8px 14px 2px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;font-weight:700;border-bottom:1px solid var(--line)}
+.lineHead .h1{flex:1}.lineHead .h2{width:74px;text-align:center}.lineHead .h3{width:66px;text-align:right}
+.actionRow{display:flex;gap:8px;padding:12px 16px 4px}
+.actionRow button{flex:1;padding:10px 4px;font-size:13px;font-weight:600;background:var(--bg);color:var(--ink);border:1px solid var(--line)}
+.actionRow button.set{background:var(--brandsoft);color:var(--brand);border-color:var(--brand)}
+textarea{font-family:inherit;width:100%;background:#fff;border:1px solid var(--line);color:var(--ink);padding:10px;border-radius:8px;font-size:14px;resize:vertical}
+.ptoggle{display:flex;gap:8px;margin-bottom:12px}
+.ptoggle button{flex:1;padding:11px;background:var(--bg);color:var(--ink);border:1px solid var(--line);font-weight:700}
+.ptoggle button.active{background:var(--brand);color:#fff;border-color:var(--brand)}
+.totals .row.disc span{color:var(--accent)}
+.bizHeader{display:flex;gap:20px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:18px;max-width:900px}
+.bizLogo{width:110px;height:90px;border:1px dashed var(--line);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;overflow:hidden;flex:0 0 auto}
+.bizLogo img{max-width:100%;max-height:100%}
+.bizName{font-size:22px;font-weight:800;color:var(--brand)}
+.bizFacts{display:flex;flex-wrap:wrap;gap:16px;margin-top:8px;color:var(--muted);font-size:13px}
+.setupTiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;max-width:900px}
+.setupTile{background:#fff;border:1px solid var(--line);border-radius:14px;padding:26px 16px;display:flex;flex-direction:column;align-items:center;gap:12px;color:var(--ink);font-weight:600;font-size:14.5px;transition:.1s}
+.setupTile:hover{border-color:var(--brand);box-shadow:0 6px 16px rgba(15,157,143,.12);transform:translateY(-2px)}
+.setupTile .ti{font-size:30px}
+.panelHead{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.panelHead h2{font-size:19px}
+.backBtn{background:var(--bg);border:1px solid var(--line);color:var(--ink);padding:8px 14px;font-weight:600;font-size:14px}
+.chipTag{display:inline-block;background:var(--brandsoft);color:var(--brand);border-radius:16px;padding:4px 12px;font-size:13px;font-weight:600;margin:0 4px 6px 0}
+.chipTag b{cursor:pointer;color:var(--danger);margin-left:4px}
+.cashierSel{background:#22303f;color:#fff;border:1px solid #33445a;border-radius:8px;padding:6px 10px;font-size:13px}
+.discPreset{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.discPreset button{background:var(--brandsoft);color:var(--brand);border:1px solid var(--brand);padding:8px 12px;font-size:13px;font-weight:600;border-radius:8px}
+.voidBtn{background:transparent;color:var(--danger);border:none;font-size:15px;cursor:pointer}
+tr.voided td{text-decoration:line-through;color:var(--muted)}
+/* Tables */
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:10px 10px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600;font-size:12.5px;text-transform:uppercase;letter-spacing:.02em}
+td.num,th.num{text-align:right}
+.miniBtn{background:var(--bg);color:var(--ink);padding:6px 11px;font-size:13px;border:1px solid var(--line);font-weight:600}
+.reportBar{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:18px}
+.stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px}
+.stat .lbl{color:var(--muted);font-size:13px}
+.stat .val{font-size:23px;font-weight:800;margin-top:4px}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.field label{font-size:13px;color:var(--muted)}
+.field .hint{font-size:12px;color:var(--muted)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.saveBtn{background:var(--brand);color:#fff;padding:12px 24px;font-weight:700}
+.tag{display:inline-block;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:2px 8px;font-size:12px;color:var(--muted);margin-left:8px}
+.mitem{display:grid;grid-template-columns:1.6fr 1.4fr 1fr .8fr .7fr auto;gap:8px;align-items:center;margin-bottom:8px}
+.mitem .mh{font-size:12px;color:var(--muted)}
+.mitem input{font-size:13px;padding:7px 9px}
+.mitem button{background:var(--danger);color:#fff;padding:8px 11px}
+.addRow button{background:var(--blue);color:#fff;padding:10px 16px;font-weight:600;margin-top:6px}
+/* KDS */
+.kdsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;align-content:start}
+.ticket{background:#fff;border:1px solid var(--line);border-radius:14px;padding:15px;border-top:5px solid var(--blue)}
+.ticket.ready{border-top-color:var(--accent);opacity:.62}
+.ticket .tkhead{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:8px}
+.ticket .tkwhere{font-weight:800;color:var(--ink);font-size:15px;margin-bottom:8px}
+.ticket .tkitem{font-size:15px;padding:4px 0;border-bottom:1px solid var(--line)}
+.ticket .tkitem b{color:var(--brand)}
+.ticket button{width:100%;margin-top:11px;padding:10px;font-weight:700;background:var(--accent);color:#fff}
+.ticket.ready button{background:var(--bg);color:var(--muted)}
+/* Modals */
+.overlay{position:fixed;inset:0;background:rgba(20,30,50,.4);display:none;align-items:center;justify-content:center;z-index:50}
+.overlay.show{display:flex}
+.modal{background:#fff;border-radius:16px;width:460px;max-width:92vw;padding:24px;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(20,30,50,.25)}
+.modal h3{font-size:18px;margin-bottom:14px}
+.modal .big{font-size:15px;display:flex;justify-content:space-between;padding:6px 0}
+.paytype{display:flex;gap:8px;margin:14px 0 8px;flex-wrap:wrap}
+.paytype button{flex:1 1 30%;padding:11px 4px;background:var(--bg);color:var(--ink);border:1px solid var(--line);font-weight:700;font-size:13px}
+.splitRow{display:flex;gap:8px;align-items:center;margin:6px 0 12px;font-size:13px;color:var(--muted)}
+.splitRow input{width:60px}
+.splitRow button{background:var(--purple);color:#fff;padding:9px 12px;font-size:13px}
+.payLines{margin:6px 0}
+.payLine{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.payLine .pm{flex:0 0 108px;font-size:13px}
+.payLine input{flex:1}
+.payLine .rm{background:transparent;color:var(--danger);font-size:16px;padding:2px 6px}
+.balRow{display:flex;justify-content:space-between;font-size:14px;padding:4px 0}
+.change{font-size:16px;color:var(--accent);font-weight:800;text-align:right;margin-top:4px;min-height:22px}
+.modal .acts{display:flex;gap:10px;margin-top:16px}
+.modal .acts button{flex:1;padding:13px;font-weight:700}
+.btn-ok{background:var(--accent);color:#fff}
+.btn-ok:disabled{background:var(--bg);color:var(--muted);cursor:not-allowed}
+.btn-cancel{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.heldRow{display:flex;align-items:center;gap:10px;padding:11px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px}
+.heldRow .hinfo{flex:1;font-size:14px;font-weight:600}
+.heldRow .hinfo small{display:block;color:var(--muted);font-size:12px;font-weight:400}
+.heldRow button{padding:8px 13px;font-size:13px;color:#fff}
+.heldRow .rc-recall{background:var(--accent)}
+.heldRow .rc-del{background:var(--danger)}
+#receipt{display:none}
+@media print{body *{visibility:hidden}#receipt,#receipt *{visibility:visible}#receipt{display:block;position:absolute;left:0;top:0;width:80mm;padding:6mm;background:#fff;color:#000}}
+.rc{font-family:'Courier New',monospace;color:#000;background:#fff;font-size:12px;line-height:1.45}
+.rc .c{text-align:center}.rc .b{font-weight:bold}.rc .lg{font-size:15px}
+.rc hr{border:none;border-top:1px dashed #000;margin:6px 0}
+.rc .r{display:flex;justify-content:space-between}
+.rc .ar{direction:rtl;text-align:right}
+.rc table{width:100%;font-size:12px}.rc td{padding:1px 0;border:none;color:#000}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot">🍽</span><span>POS</span></div>
+    <nav class="snav" id="snav">
+      <button data-view="dash" class="active"><span class="ic">📊</span><span data-i18n="nav_dash">Dashboard</span></button>
+      <button data-view="pos"><span class="ic">🧾</span><span data-i18n="nav_register">Register</span></button>
+      <button data-view="kitchen"><span class="ic">🍳</span><span data-i18n="nav_kitchen">Kitchen</span></button>
+      <button data-view="customers"><span class="ic">👥</span><span data-i18n="nav_customers">Customers</span></button>
+      <button data-view="reports"><span class="ic">📈</span><span data-i18n="nav_reports">Reports</span></button>
+      <button data-view="settings"><span class="ic">⚙️</span><span data-i18n="nav_settings">Settings</span></button>
+    </nav>
+    <div class="sidefoot">
+      <button class="langBtn" id="langBtn">العربية</button>
+    </div>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <h1 id="appTitle">Restaurant POS</h1>
+      <span class="biz" id="bizLabel"></span>
+      <select class="cashierSel" id="cashierSel" title="Cashier on shift" style="margin-left:auto"></select>
+      <div class="clock" id="clock"></div>
+    </header>
+    <div class="views">
+      <!-- DASHBOARD -->
+      <div id="dash" class="view active"><div class="pane">
+        <h2 data-i18n="dash_title">Live Business Dashboard</h2>
+        <p class="sub" data-i18n="dash_sub">Today at a glance — updates automatically.</p>
+        <div class="kpis" id="kpis"></div>
+        <div class="dashgrid">
+          <div>
+            <div class="card"><h3>📡 <span data-i18n="live_orders">Live orders</span></h3><div class="feed" id="liveFeed"></div></div>
+          </div>
+          <div>
+            <div class="card"><h3>🛵 <span data-i18n="sales_by_channel">Sales by channel</span></h3><div id="chanBars"></div></div>
+            <div class="card"><h3>🔥 <span data-i18n="top_items">Top items today</span></h3><div id="topItems"></div></div>
+          </div>
+        </div>
+      </div></div>
+      <!-- REGISTER -->
+      <div id="pos" class="view">
+        <div class="menuArea">
+          <div class="lowbar" id="lowbar"></div>
+          <div class="menusearch"><input id="menuSearch" placeholder="🔍 Search menu item"></div>
+          <div class="cats" id="cats"></div>
+          <div class="grid" id="grid"></div>
+        </div>
+        <div class="order">
+          <div class="head">
+            <div class="headTop">
+              <span class="ttl" data-i18n="order">Order</span>
+              <button class="openBtn" id="openOrdersBtn">Open Orders (0)</button>
+            </div>
+            <div class="otypes" id="otypes">
+              <button data-ot="Dine-in" class="active" data-i18n="dinein">Dine-in</button>
+              <button data-ot="Takeaway" data-i18n="takeaway">Takeaway</button>
+              <button data-ot="Delivery" data-i18n="delivery">Delivery</button>
+            </div>
+            <div class="octxFields" id="octxFields"></div>
+          </div>
+          <div class="lineHead"><span class="h1" data-i18n="col_item">Item</span><span class="h2">QTY</span><span class="h3" data-i18n="col_sub">Subtotal</span></div>
+          <div class="lines" id="lines"></div>
+          <div class="totals" id="totals"></div>
+          <div class="actionRow">
+            <button id="noteBtn">📝 <span data-i18n="add_notes">Add Notes</span></button>
+            <button id="discBtn">﹪ <span data-i18n="discount">Discount</span></button>
+          </div>
+          <div class="payrow2">
+            <button class="btn-kot" id="kotBtn" data-i18n="kitchen_send">🍳 Kitchen</button>
+            <button class="btn-hold" id="holdBtn" data-i18n="hold">⏸ Hold</button>
+            <button class="btn-clear" id="clearBtn" data-i18n="clear">Clear</button>
+          </div>
+          <div class="payrow"><button id="payBtn" data-i18n="charge">Charge</button></div>
+        </div>
+      </div>
+      <!-- KITCHEN -->
+      <div id="kitchen" class="view"><div class="pane">
+        <div style="display:flex;align-items:center;margin-bottom:16px;gap:12px">
+          <h2 data-i18n="kds_title">Kitchen Display</h2><span style="flex:1"></span>
+          <button class="miniBtn" id="kdsClearReady" data-i18n="clear_ready">Clear ready</button>
+        </div>
+        <div class="kdsGrid" id="kdsGrid"></div>
+      </div></div>
+      <!-- CUSTOMERS -->
+      <div id="customers" class="view"><div class="pane">
+        <h2 data-i18n="crm_title">Customers (CRM)</h2>
+        <p class="sub" data-i18n="crm_sub">Everyone who gave a phone number on a takeaway or delivery order.</p>
+        <div class="reportBar"><input id="custSearch" placeholder="🔍 Search name or phone" style="min-width:260px"></div>
+        <div class="card"><table id="crmTable"></table></div>
+      </div></div>
+      <!-- REPORTS -->
+      <div id="reports" class="view"><div class="pane">
+        <h2 data-i18n="nav_reports">Sales Reports</h2>
+        <p class="sub">Z-report, channels and stock. All figures in AED.</p>
+        <div class="reportBar">
+          <input type="date" id="repDate">
+          <button class="miniBtn" id="repToday">Today</button>
+          <button class="miniBtn" id="repAll">All time</button>
+          <span style="flex:1"></span>
+          <button class="miniBtn" id="printZ">🖨 Z-Report</button>
+          <button class="miniBtn" id="exportCsv">⬇ CSV</button>
+          <button class="miniBtn" id="exportJson">⬇ e-Invoice JSON</button>
+        </div>
+        <div class="stats" id="repStats"></div>
+        <div class="grid2">
+          <div class="card"><h3>Payment breakdown</h3><table id="payTable"></table></div>
+          <div class="card"><h3>Sales by order type</h3><table id="typeTable"></table></div>
+          <div class="card"><h3>Delivery by channel</h3><table id="chanTable"></table></div>
+          <div class="card"><h3>Items sold</h3><table id="itemTable"></table></div>
+        </div>
+        <div class="card"><h3>Stock levels</h3><table id="stockTable"></table></div>
+        <div class="card"><h3>Transactions</h3><table id="txnTable"></table></div>
+      </div></div>
+      <!-- SETTINGS -->
+      <div id="settings" class="view"><div class="pane">
+        <div id="setupHub">
+          <div class="bizHeader">
+            <div class="bizLogo" id="bizLogoBox"><span>NO LOGO</span></div>
+            <div class="bizMeta"><div class="bizName" id="setupBizName">My Restaurant</div><div class="bizFacts" id="setupBizFacts"></div></div>
+          </div>
+          <div class="setupTiles" id="setupTiles"></div>
+        </div>
+        <div id="setupPanel" style="display:none">
+          <div class="panelHead"><button class="backBtn" id="setupBack">← <span data-i18n="nav_settings">Setup</span></button><h2 id="panelTitle"></h2><span id="savedMsg" style="color:var(--accent);font-size:14px"></span></div>
+          <div id="panelBody"></div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="payModal"><div class="modal">
+  <h3 data-i18n="take_payment">Take payment</h3>
+  <div class="big"><span data-i18n="total_due">Total due</span><span id="m_total" class="b">AED 0.00</span></div>
+  <div id="fullInvWrap" style="display:none;margin-top:10px">
+    <div class="field"><label style="font-size:13px;color:#b9761b">⚠ AED 10,000+ — full tax invoice needs customer details</label></div>
+    <div class="two"><div class="field"><input id="m_custName" placeholder="Customer name"></div>
+      <div class="field"><input id="m_custTrn" placeholder="Customer TRN"></div></div>
+  </div>
+  <div class="paytype" id="paytype"></div>
+  <div class="splitRow"><span data-i18n="split_into">Split equally into</span> <input id="m_splitN" type="number" min="2" value="2"> <span data-i18n="ways">ways</span>
+    <button id="m_splitBtn" data-i18n="split_card">Split (Card)</button></div>
+  <div class="payLines" id="payLines"></div>
+  <div class="balRow"><span data-i18n="paid">Paid</span><span id="m_paid">AED 0.00</span></div>
+  <div class="balRow" id="m_remWrap"><span data-i18n="remaining">Remaining</span><span id="m_rem">AED 0.00</span></div>
+  <div class="change" id="m_change"></div>
+  <div class="acts"><button class="btn-cancel" id="m_cancel" data-i18n="cancel">Cancel</button>
+    <button class="btn-ok" id="m_confirm" disabled data-i18n="complete_print">Complete &amp; Print</button></div>
+</div></div>
+
+<div class="overlay" id="openModal"><div class="modal">
+  <h3 data-i18n="open_orders">Open Orders</h3>
+  <div id="heldList"></div>
+  <div class="acts"><button class="btn-cancel" id="open_close" data-i18n="close">Close</button></div>
+</div></div>
+
+<div class="overlay" id="discModal"><div class="modal">
+  <h3 data-i18n="discount">Discount</h3>
+  <div class="discPreset" id="discPreset"></div>
+  <div class="ptoggle" id="discType">
+    <button data-dt="pct" class="active">% Percent</button>
+    <button data-dt="amt">AED Amount</button>
+  </div>
+  <div class="field"><input id="discVal" type="number" step="0.01" min="0" placeholder="0"></div>
+  <div class="acts">
+    <button class="btn-cancel" id="disc_remove" data-i18n="remove">Remove</button>
+    <button class="btn-cancel" id="disc_cancel" data-i18n="cancel">Cancel</button>
+    <button class="btn-ok" id="disc_apply" data-i18n="apply">Apply</button>
+  </div>
+</div></div>
+<div class="overlay" id="noteModal"><div class="modal">
+  <h3 data-i18n="order_note">Order note</h3>
+  <textarea id="noteText" rows="3" placeholder="e.g. no onions, extra spicy, allergy note..."></textarea>
+  <div class="acts">
+    <button class="btn-cancel" id="note_cancel" data-i18n="cancel">Cancel</button>
+    <button class="btn-ok" id="note_save" data-i18n="save">Save</button>
+  </div>
+</div></div>
+<div id="receipt"><div class="rc" id="rcBody"></div></div>
+<script>
+const I18N={
+  nav_dash:{en:'Dashboard',ar:'لوحة التحكم'}, nav_register:{en:'Register',ar:'الكاشير'}, nav_kitchen:{en:'Kitchen',ar:'المطبخ'},
+  nav_customers:{en:'Customers',ar:'العملاء'}, nav_reports:{en:'Reports',ar:'التقارير'}, nav_settings:{en:'Setup',ar:'الإعداد'},
+  dash_title:{en:'Live Business Dashboard',ar:'لوحة الأعمال المباشرة'}, dash_sub:{en:'Today at a glance — updates automatically.',ar:'ملخص اليوم — يتحدث تلقائياً.'},
+  live_orders:{en:'Live orders',ar:'الطلبات المباشرة'}, sales_by_channel:{en:'Sales by channel',ar:'المبيعات حسب المنصة'}, top_items:{en:'Top items today',ar:'الأصناف الأكثر مبيعاً اليوم'},
+  crm_title:{en:'Customers (CRM)',ar:'العملاء'}, crm_sub:{en:'Everyone who gave a phone number on a takeaway or delivery order.',ar:'كل من قدّم رقم هاتف على طلب سفري أو توصيل.'},
+  order:{en:'Order',ar:'الطلب'}, dinein:{en:'Dine-in',ar:'صالة'}, takeaway:{en:'Takeaway',ar:'سفري'}, delivery:{en:'Delivery',ar:'توصيل'},
+  kitchen_send:{en:'🍳 Kitchen',ar:'🍳 المطبخ'}, hold:{en:'⏸ Hold',ar:'⏸ تعليق'}, clear:{en:'Clear',ar:'مسح'}, charge:{en:'Charge',ar:'الدفع'},
+  take_payment:{en:'Take payment',ar:'استلام الدفع'}, total_due:{en:'Total due',ar:'المبلغ المستحق'}, paid:{en:'Paid',ar:'المدفوع'}, remaining:{en:'Remaining',ar:'المتبقي'},
+  complete_print:{en:'Complete & Print',ar:'إتمام وطباعة'}, cancel:{en:'Cancel',ar:'إلغاء'}, split_into:{en:'Split equally into',ar:'تقسيم بالتساوي إلى'}, ways:{en:'ways',ar:'أجزاء'},
+  split_card:{en:'Split (Card)',ar:'تقسيم (بطاقة)'}, open_orders:{en:'Open Orders',ar:'الطلبات المفتوحة'}, close:{en:'Close',ar:'إغلاق'},
+  kds_title:{en:'Kitchen Display',ar:'شاشة المطبخ'}, clear_ready:{en:'Clear ready',ar:'مسح الجاهزة'},
+  table:{en:'Table',ar:'طاولة'}, cust_name:{en:'Customer name',ar:'اسم العميل'}, cust_phone:{en:'Phone (loyalty)',ar:'الهاتف (الولاء)'},
+  no_items:{en:'No items yet.',ar:'لا توجد أصناف بعد.'}, tap_menu:{en:'Tap the menu to add.',ar:'اختر من القائمة للإضافة.'},
+  subtotal:{en:'Subtotal',ar:'المجموع الفرعي'}, service:{en:'Service',ar:'الخدمة'}, municipality:{en:'Municipality',ar:'رسوم البلدية'}, vat:{en:'VAT',ar:'ض.ق.م'}, total:{en:'Total',ar:'الإجمالي'},
+  mark_ready:{en:'Mark Ready',ar:'جاهز'}, recall:{en:'Recall',ar:'استرجاع'},
+  kpi_sales:{en:'Sales today',ar:'مبيعات اليوم'}, kpi_orders:{en:'Orders',ar:'الطلبات'}, kpi_avg:{en:'Avg ticket',ar:'متوسط الفاتورة'}, kpi_vat:{en:'VAT collected',ar:'الضريبة المحصلة'}, kpi_kitchen:{en:'In kitchen',ar:'في المطبخ'},
+  add_notes:{en:'Add Notes',ar:'إضافة ملاحظة'}, discount:{en:'Discount',ar:'خصم'}, order_note:{en:'Order note',ar:'ملاحظة الطلب'},
+  save:{en:'Save',ar:'حفظ'}, remove:{en:'Remove',ar:'إزالة'}, apply:{en:'Apply',ar:'تطبيق'}, col_item:{en:'Item',ar:'الصنف'}, col_sub:{en:'Subtotal',ar:'المجموع'}
+};
+function T(k){const e=I18N[k];return e?(e[lang]||e.en):k;}
+const LS='uae_pos_sapaad';
+const CHANNELS=['Talabat','Deliveroo','Zomato','Careem','Noon'];
+const CHANCOLOR={Talabat:'var(--tal)',Deliveroo:'var(--del)',Zomato:'var(--zom)',Careem:'var(--car)',Noon:'#caa500','Dine-in':'var(--brand)','Takeaway':'var(--purple)'};
+const PAYMETHODS=[['Cash','💵'],['Card','💳'],['Apple Pay','🍎'],['Google Pay','🅶'],['Samsung Pay','📱']];
+const defaults={
+  settings:{name:'My Restaurant',nameAr:'مطعمي',addr:'Dubai, United Arab Emirates',trn:'100000000000003',phone:'+971 4 000 0000',vat:5,service:0,muni:0,curr:'AED',prefix:'INV-',lang:'en',logo:'',endOfDay:'12:00 AM'},
+  payTypes:[{name:'Cash',icon:'💵',on:true},{name:'Card',icon:'💳',on:true},{name:'Apple Pay',icon:'🍎',on:true},{name:'Google Pay',icon:'🅶',on:true},{name:'Samsung Pay',icon:'📱',on:true}],
+  discounts:[{label:'Staff Meal 20%',type:'pct',value:20},{label:'Loyalty 10%',type:'pct',value:10},{label:'AED 5 Off',type:'amt',value:5}],
+  reasons:['Customer changed mind','Wrong order','Item out of stock','Kitchen delay','Duplicate order'],
+  roles:['Admin','Manager','Cashier','Waiter','Delivery Boy'],
+  staff:[{name:'Dhruv',role:'Admin',pin:'1234'}],
+  channels:[{name:'Talabat',commission:25},{name:'Deliveroo',commission:25},{name:'Zomato',commission:22},{name:'Careem',commission:20},{name:'Noon',commission:20}],
+  menu:[
+    {n:'Chicken Shawarma',na:'شاورما دجاج',c:'Main',p:18,s:40},{n:'Beef Burger',na:'برجر لحم',c:'Main',p:35,s:25},
+    {n:'Grilled Chicken',na:'دجاج مشوي',c:'Main',p:45,s:20},{n:'Falafel Wrap',na:'فلافل',c:'Main',p:15,s:50},
+    {n:'Mixed Grill',na:'مشاوي مشكلة',c:'Main',p:75,s:12},{n:'Margherita Pizza',na:'بيتزا مارغريتا',c:'Main',p:42,s:18},
+    {n:'Hummus',na:'حمص',c:'Starters',p:16,s:30},{n:'Fattoush',na:'فتوش',c:'Starters',p:22,s:24},
+    {n:'French Fries',na:'بطاطا مقلية',c:'Starters',p:14,s:60},{n:'Spring Rolls',na:'سبرينغ رول',c:'Starters',p:20,s:20},
+    {n:'Karak Tea',na:'شاي كرك',c:'Drinks',p:5,s:null},{n:'Fresh Orange Juice',na:'عصير برتقال',c:'Drinks',p:18,s:35},
+    {n:'Soft Drink',na:'مشروب غازي',c:'Drinks',p:8,s:80},{n:'Water',na:'ماء',c:'Drinks',p:3,s:120},{n:'Arabic Coffee',na:'قهوة عربية',c:'Drinks',p:12,s:null},
+    {n:'Kunafa',na:'كنافة',c:'Desserts',p:25,s:15},{n:'Umm Ali',na:'أم علي',c:'Desserts',p:22,s:14},{n:'Baklava',na:'بقلاوة',c:'Desserts',p:18,s:22}
+  ],
+  txns:[], held:[], kds:[], counter:1, heldSeq:1, kdsSeq:1
+};
+let db=load();
+function load(){try{const d=JSON.parse(localStorage.getItem(LS));if(d&&d.settings){d.held=d.held||[];d.kds=d.kds||[];d.heldSeq=d.heldSeq||1;d.kdsSeq=d.kdsSeq||1;
+  d.payTypes=d.payTypes||JSON.parse(JSON.stringify(defaults.payTypes));d.discounts=d.discounts||JSON.parse(JSON.stringify(defaults.discounts));
+  d.reasons=d.reasons||defaults.reasons.slice();d.roles=d.roles||defaults.roles.slice();d.staff=d.staff||JSON.parse(JSON.stringify(defaults.staff));
+  d.channels=d.channels||JSON.parse(JSON.stringify(defaults.channels));if(d.settings.logo===undefined)d.settings.logo='';if(!d.settings.endOfDay)d.settings.endOfDay='12:00 AM';
+  return d;}}catch(e){}return JSON.parse(JSON.stringify(defaults));}
+function save(){localStorage.setItem(LS,JSON.stringify(db));}
+let lang=db.settings.lang||'en';
+let order=[]; let activeCat=null;
+let cur={type:'Dine-in',table:'',channel:'Talabat',custName:'',custPhone:'',note:'',discount:null};
+const money=n=>db.settings.curr+' '+Number(n).toFixed(2);
+const num=n=>Number(n).toFixed(2);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const LOW=5;
+function payList(){return (db.payTypes||[]).filter(p=>p.on).map(p=>[p.name,p.icon]);}
+function payIcon(name){const p=(db.payTypes||[]).find(x=>x.name===name);return p?p.icon:'💳';}
+function chanList(){return (db.channels||[]).map(c=>c.name);}
+function chanCommission(name){const c=(db.channels||[]).find(x=>x.name===name);return c?(+c.commission||0):0;}
+const nameOf=m=>lang==='ar'&&m.na?m.na:m.n;
+const todayStr=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+
+function applyLang(){
+  document.querySelectorAll('[data-i18n]').forEach(el=>{el.textContent=T(el.dataset.i18n);});
+  document.getElementById('langBtn').textContent=lang==='en'?'العربية':'English';
+  renderOctx();renderCats();renderGrid();renderOrder();renderPaytypeButtons();
+  document.getElementById('openOrdersBtn').textContent=T('open_orders')+' ('+db.held.length+')';
+}
+document.getElementById('langBtn').onclick=()=>{lang=lang==='en'?'ar':'en';db.settings.lang=lang;save();applyLang();refreshActive();};
+
+/* Menu */
+function cats(){return [...new Set(db.menu.map(m=>m.c))];}
+function renderCats(){
+  const wrap=document.getElementById('cats');const cs=cats();
+  if(!activeCat||!cs.includes(activeCat))activeCat=cs[0];
+  wrap.innerHTML='';
+  cs.forEach(c=>{const b=document.createElement('button');b.className='cat'+(c===activeCat?' active':'');
+    b.textContent=c;b.onclick=()=>{activeCat=c;renderCats();renderGrid();};wrap.appendChild(b);});
+}
+function renderGrid(){
+  const g=document.getElementById('grid');g.innerHTML='';
+  const se=document.getElementById('menuSearch');const q=(se?se.value:'').trim().toLowerCase();
+  const list=q?db.menu.filter(m=>m.n.toLowerCase().includes(q)||(m.na&&m.na.includes(q))):db.menu.filter(m=>m.c===activeCat);
+  list.forEach(m=>{
+    const b=document.createElement('button');const tracked=typeof m.s==='number';const out=tracked&&m.s<=0;
+    b.className='item'+(out?' out':'');
+    let badge='';if(tracked){const cls=m.s<=0?'zero':(m.s<=LOW?'low':'');badge=`<span class="stockBadge ${cls}">${m.s}</span>`;}
+    const ar=m.na?`<span class="nmar">${esc(m.na)}</span>`:'';
+    b.innerHTML=`${badge}<span class="nm">${esc(m.n)}</span>${ar}<span class="pr">${money(m.p)}</span>`;
+    b.onclick=()=>addItem(m);g.appendChild(b);
+  });
+  renderLowBar();
+}
+function renderLowBar(){
+  const low=db.menu.filter(m=>typeof m.s==='number'&&m.s<=LOW);const bar=document.getElementById('lowbar');
+  if(low.length){bar.classList.add('show');bar.textContent='⚠ Low / out of stock: '+low.map(m=>m.n+' ('+m.s+')').join(', ');}
+  else bar.classList.remove('show');
+}
+/* Order context */
+document.getElementById('otypes').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+  cur.type=b.dataset.ot;
+  document.getElementById('otypes').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x.dataset.ot===cur.type));
+  renderOctx();
+});
+function renderOctx(){
+  const w=document.getElementById('octxFields');w.innerHTML='';
+  if(cur.type==='Dine-in'){
+    w.innerHTML=`<input id="f_table" placeholder="${T('table')} #" value="${esc(cur.table)}">`;
+    document.getElementById('f_table').oninput=e=>cur.table=e.target.value;
+  }else if(cur.type==='Delivery'){
+    const opts=chanList().map(c=>`<option ${c===cur.channel?'selected':''}>${c}</option>`).join('');
+    w.innerHTML=`<select id="f_chan">${opts}</select><input id="f_cname" placeholder="${T('cust_name')}" value="${esc(cur.custName)}"><input id="f_cphone" placeholder="${T('cust_phone')}" value="${esc(cur.custPhone)}">`;
+    document.getElementById('f_chan').onchange=e=>cur.channel=e.target.value;
+    document.getElementById('f_cname').oninput=e=>cur.custName=e.target.value;
+    document.getElementById('f_cphone').oninput=e=>cur.custPhone=e.target.value;
+  }else{
+    w.innerHTML=`<input id="f_cname" placeholder="${T('cust_name')}" value="${esc(cur.custName)}"><input id="f_cphone" placeholder="${T('cust_phone')}" value="${esc(cur.custPhone)}">`;
+    document.getElementById('f_cname').oninput=e=>cur.custName=e.target.value;
+    document.getElementById('f_cphone').oninput=e=>cur.custPhone=e.target.value;
+  }
+  document.getElementById('otypes').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x.dataset.ot===cur.type));
+}
+function whereLabel(t){
+  if(t.type==='Dine-in')return T('dinein')+(t.table?' · '+T('table')+' '+t.table:'');
+  if(t.type==='Delivery')return T('delivery')+' · '+t.channel;
+  return T('takeaway');
+}
+function whereLabelRaw(t){
+  if(t.type==='Dine-in')return 'Dine-in'+(t.table?' - Table '+t.table:'');
+  if(t.type==='Delivery')return 'Delivery - '+t.channel;
+  return 'Takeaway';
+}
+function segOf(t){return t.type==='Delivery'?t.channel:t.type;}
+/* Cart */
+function addItem(m){
+  const inCart=order.filter(o=>o.n===m.n).reduce((s,o)=>s+o.q,0);
+  if(typeof m.s==='number'&&inCart>=m.s){if(!confirm('Only '+m.s+' of "'+m.n+'" in stock. Add anyway?'))return;}
+  const e=order.find(o=>o.n===m.n&&o.p===m.p);if(e)e.q++;else order.push({n:m.n,na:m.na||'',p:m.p,q:1});renderOrder();
+}
+function chg(i,d){order[i].q+=d;if(order[i].q<=0)order.splice(i,1);renderOrder();}
+function del(i){order.splice(i,1);renderOrder();}
+function calc(disc){
+  const d=disc!==undefined?disc:cur.discount;
+  const sub=order.reduce((s,o)=>s+o.p*o.q,0);
+  let discAmt=0;
+  if(d){discAmt=d.type==='pct'?sub*(+d.value||0)/100:Math.min(+d.value||0,sub);}
+  discAmt=+discAmt.toFixed(2);
+  const net=+(sub-discAmt).toFixed(2);
+  const svc=net*(+db.settings.service||0)/100;const muni=net*(+db.settings.muni||0)/100;
+  const base=net+svc+muni;const vat=base*(+db.settings.vat||0)/100;
+  return {sub,disc:discAmt,net,svc,muni,base,vat,total:base+vat};
+}
+function renderOrder(){
+  const L=document.getElementById('lines');
+  if(!order.length){L.innerHTML=`<div class="empty">${T('no_items')}<br>${T('tap_menu')}</div>`;}
+  else{L.innerHTML='';order.forEach((o,i)=>{
+    const d=document.createElement('div');d.className='line';
+    d.innerHTML=`<div class="lnm">${esc(nameOf(o))}<small>${money(o.p)}</small></div><div class="qtybox"><button>&minus;</button><span>${o.q}</span><button>+</button></div><div class="lt">${num(o.p*o.q)}</div><button class="del">✕</button>`;
+    const bs=d.querySelectorAll('button');bs[0].onclick=()=>chg(i,-1);bs[1].onclick=()=>chg(i,1);bs[2].onclick=()=>del(i);L.appendChild(d);
+  });}
+  const t=calc();const s=db.settings;const T2=document.getElementById('totals');
+  let rows=`<div class="row"><span>${T('subtotal')}</span><span>${money(t.sub)}</span></div>`;
+  if(t.disc>0){const lbl=cur.discount.type==='pct'?T('discount')+' ('+cur.discount.value+'%)':T('discount');rows+=`<div class="row disc"><span>${lbl}</span><span>− ${money(t.disc)}</span></div>`;}
+  if(+s.service>0)rows+=`<div class="row"><span>${T('service')} (${s.service}%)</span><span>${money(t.svc)}</span></div>`;
+  if(+s.muni>0)rows+=`<div class="row"><span>${T('municipality')} (${s.muni}%)</span><span>${money(t.muni)}</span></div>`;
+  rows+=`<div class="row"><span>${T('vat')} (${s.vat}%)</span><span>${money(t.vat)}</span></div>`;
+  rows+=`<div class="row grand"><span>${T('total')}</span><span>${money(t.total)}</span></div>`;T2.innerHTML=rows;
+  updateActionBtns();
+}
+function updateActionBtns(){
+  const nb=document.getElementById('noteBtn'),dbn=document.getElementById('discBtn');
+  if(nb)nb.classList.toggle('set',!!(cur.note&&cur.note.trim()));
+  if(dbn)dbn.classList.toggle('set',!!cur.discount);
+}
+document.getElementById('clearBtn').onclick=()=>{if(order.length&&confirm('Clear the current order?')){resetOrder();}};
+document.getElementById('menuSearch').oninput=renderGrid;
+document.getElementById('noteBtn').onclick=()=>{document.getElementById('noteText').value=cur.note||'';document.getElementById('noteModal').classList.add('show');};
+document.getElementById('note_cancel').onclick=()=>document.getElementById('noteModal').classList.remove('show');
+document.getElementById('note_save').onclick=()=>{cur.note=document.getElementById('noteText').value;document.getElementById('noteModal').classList.remove('show');renderOrder();};
+let discType='pct';
+document.getElementById('discType').querySelectorAll('button').forEach(b=>b.onclick=()=>{discType=b.dataset.dt;document.getElementById('discType').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x.dataset.dt===discType));});
+document.getElementById('discBtn').onclick=()=>{
+  discType=cur.discount?cur.discount.type:'pct';
+  document.getElementById('discType').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x.dataset.dt===discType));
+  document.getElementById('discVal').value=cur.discount?cur.discount.value:'';
+  const dp=document.getElementById('discPreset');dp.innerHTML='';
+  (db.discounts||[]).forEach(d=>{const bt=document.createElement('button');bt.textContent=d.label+' ('+(d.type==='pct'?d.value+'%':'AED '+d.value)+')';bt.onclick=()=>{cur.discount={type:d.type,value:d.value};document.getElementById('discModal').classList.remove('show');renderOrder();};dp.appendChild(bt);});
+  document.getElementById('discModal').classList.add('show');
+};
+document.getElementById('disc_cancel').onclick=()=>document.getElementById('discModal').classList.remove('show');
+document.getElementById('disc_remove').onclick=()=>{cur.discount=null;document.getElementById('discModal').classList.remove('show');renderOrder();};
+document.getElementById('disc_apply').onclick=()=>{
+  const v=parseFloat(document.getElementById('discVal').value||0);
+  cur.discount=(!v||v<=0)?null:{type:discType,value:v};
+  document.getElementById('discModal').classList.remove('show');renderOrder();
+};
+function resetOrder(){order=[];cur={type:'Dine-in',table:'',channel:'Talabat',custName:'',custPhone:'',note:'',discount:null};
+  document.getElementById('otypes').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x.dataset.ot==='Dine-in'));renderOctx();renderOrder();updateActionBtns();}
+/* Hold */
+document.getElementById('holdBtn').onclick=()=>{
+  if(!order.length){alert('Add items first.');return;}
+  db.held.push({id:db.heldSeq++,ts:new Date().toISOString(),type:cur.type,table:cur.table,channel:cur.channel,custName:cur.custName,custPhone:cur.custPhone,note:cur.note,discount:cur.discount,items:order.map(o=>({n:o.n,na:o.na,p:o.p,q:o.q}))});
+  save();resetOrder();updateOpenBtn();
+};
+function updateOpenBtn(){document.getElementById('openOrdersBtn').textContent=T('open_orders')+' ('+db.held.length+')';}
+document.getElementById('openOrdersBtn').onclick=()=>{renderHeld();document.getElementById('openModal').classList.add('show');};
+document.getElementById('open_close').onclick=()=>document.getElementById('openModal').classList.remove('show');
+function renderHeld(){
+  const w=document.getElementById('heldList');
+  if(!db.held.length){w.innerHTML=`<div class="empty">${T('no_items')}</div>`;return;}
+  w.innerHTML='';
+  db.held.forEach(h=>{
+    const total=h.items.reduce((s,o)=>s+o.p*o.q,0);const r=document.createElement('div');r.className='heldRow';
+    r.innerHTML=`<div class="hinfo">${whereLabel(h)}<small>${h.items.length} items · ${money(total)} · ${new Date(h.ts).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</small></div><button class="rc-recall">${T('recall')}</button><button class="rc-del">✕</button>`;
+    r.querySelector('.rc-recall').onclick=()=>recallHeld(h.id);
+    r.querySelector('.rc-del').onclick=()=>{db.held=db.held.filter(x=>x.id!==h.id);save();renderHeld();updateOpenBtn();};w.appendChild(r);
+  });
+}
+function recallHeld(id){
+  if(order.length&&!confirm('Replace the current order with this one?'))return;
+  const h=db.held.find(x=>x.id===id);if(!h)return;
+  order=h.items.map(o=>({n:o.n,na:o.na,p:o.p,q:o.q}));
+  cur={type:h.type,table:h.table||'',channel:h.channel||'Talabat',custName:h.custName||'',custPhone:h.custPhone||'',note:h.note||'',discount:h.discount||null};
+  db.held=db.held.filter(x=>x.id!==id);save();
+  document.getElementById('otypes').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x.dataset.ot===cur.type));
+  renderOctx();renderOrder();updateOpenBtn();document.getElementById('openModal').classList.remove('show');
+}
+/* Kitchen */
+document.getElementById('kotBtn').onclick=()=>{
+  if(!order.length){alert('Add items first.');return;}
+  db.kds.push({id:db.kdsSeq++,ts:new Date().toISOString(),type:cur.type,table:cur.table,channel:cur.channel,note:cur.note,items:order.map(o=>({n:o.n,na:o.na,q:o.q})),status:'new'});
+  save();printKOT({type:cur.type,table:cur.table,channel:cur.channel,note:cur.note,items:order.map(o=>({n:o.n,na:o.na,q:o.q})),ts:new Date().toISOString()});
+  if(document.getElementById('kitchen').classList.contains('active'))renderKDS();
+};
+function printKOT(tk){
+  const s=db.settings;const d=new Date(tk.ts);
+  let items='';tk.items.forEach(o=>{items+=`<tr><td class="b" style="font-size:16px">${o.q} ×</td><td class="b" style="font-size:16px">${esc(o.n)}</td></tr>`;});
+  document.getElementById('rcBody').innerHTML=`<div class="c b lg">KITCHEN ORDER</div><div class="c">${esc(s.name)}</div><div class="r"><span>${d.toLocaleDateString('en-GB')}</span><span>${d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</span></div><div class="c b lg" style="margin-top:4px">${esc(whereLabelRaw(tk))}</div><hr><table>${items}</table>${tk.note?`<hr><div class="b">📝 ${esc(tk.note)}</div>`:''}<hr><div class="c">*** NOT A TAX INVOICE ***</div>`;
+  window.print();
+}
+function renderKDS(){
+  const g=document.getElementById('kdsGrid');const active=db.kds;
+  if(!active.length){g.innerHTML=`<div class="empty">${lang==='ar'?'لا توجد طلبات في المطبخ':'No kitchen orders. Send one from the Register (🍳 Kitchen).'}</div>`;return;}
+  g.innerHTML='';
+  [...active].reverse().forEach(tk=>{
+    const mins=Math.floor((Date.now()-new Date(tk.ts).getTime())/60000);
+    const d=document.createElement('div');d.className='ticket'+(tk.status==='ready'?' ready':'');
+    let items='';tk.items.forEach(o=>{items+=`<div class="tkitem"><b>${o.q}×</b> ${esc(lang==='ar'&&o.na?o.na:o.n)}</div>`;});
+    d.innerHTML=`<div class="tkhead"><span>#${tk.id}</span><span>${mins}m</span></div><div class="tkwhere">${esc(whereLabel(tk))}</div>${items}${tk.note?`<div class="tkitem" style="color:#b9761b">📝 ${esc(tk.note)}</div>`:''}<button>${tk.status==='ready'?T('recall'):T('mark_ready')}</button>`;
+    d.querySelector('button').onclick=()=>{tk.status=tk.status==='ready'?'new':'ready';save();renderKDS();};g.appendChild(d);
+  });
+}
+document.getElementById('kdsClearReady').onclick=()=>{db.kds=db.kds.filter(t=>t.status!=='ready');save();renderKDS();};
+/* Payment */
+const payModal=document.getElementById('payModal');let payLines=[];
+function renderPaytypeButtons(){const w=document.getElementById('paytype');w.innerHTML='';payList().forEach(([m,ic])=>{const b=document.createElement('button');b.textContent=ic+' '+m;b.onclick=()=>addPayLine(m);w.appendChild(b);});}
+document.getElementById('payBtn').onclick=()=>{
+  if(!order.length){alert('Add items first.');return;}
+  const t=calc();document.getElementById('m_total').textContent=money(t.total);
+  document.getElementById('fullInvWrap').style.display=t.total>=10000?'block':'none';
+  document.getElementById('m_custName').value=cur.custName||'';document.getElementById('m_custTrn').value='';
+  payLines=[];renderPayLines();payModal.classList.add('show');
+};
+function balance(){const t=calc().total;const paid=payLines.reduce((s,l)=>s+(+l.amount||0),0);return {total:t,paid,rem:t-paid};}
+function addPayLine(method){const b=balance();const amt=Math.max(0,+((b.rem>0?b.rem:0)).toFixed(2));payLines.push({method,amount:amt});renderPayLines();}
+function splitEqually(){
+  const n=Math.max(2,parseInt(document.getElementById('m_splitN').value||2));const t=calc().total;payLines=[];
+  const each=Math.floor(t/n*100)/100;let acc=0;
+  for(let i=0;i<n;i++){let a=each;if(i===n-1)a=+(t-acc).toFixed(2);acc+=a;payLines.push({method:'Card',amount:a});}renderPayLines();
+}
+function renderPayLines(){
+  const w=document.getElementById('payLines');w.innerHTML='';
+  payLines.forEach((l,i)=>{
+    const ic=payIcon(l.method);const r=document.createElement('div');r.className='payLine';
+    r.innerHTML=`<span class="pm">${ic} ${l.method}</span><input type="number" step="0.01" value="${l.amount}"><button class="rm">✕</button>`;
+    const inp=r.querySelector('input');inp.oninput=()=>{payLines[i].amount=parseFloat(inp.value||0);updateBal();};
+    r.querySelector('.rm').onclick=()=>{payLines.splice(i,1);renderPayLines();};w.appendChild(r);
+  });updateBal();
+}
+function updateBal(){
+  const b=balance();document.getElementById('m_paid').textContent=money(b.paid);
+  const remWrap=document.getElementById('m_remWrap');const chg=document.getElementById('m_change');
+  if(b.rem>0.001){remWrap.style.display='flex';document.getElementById('m_rem').textContent=money(b.rem);chg.textContent='';}
+  else{remWrap.style.display='none';const change=-b.rem;chg.textContent=change>0.001?(lang==='ar'?'الباقي: ':'Change: ')+money(change):'';}
+  document.getElementById('m_confirm').disabled=b.paid<b.total-0.001;
+}
+document.getElementById('m_splitBtn').onclick=splitEqually;
+document.getElementById('m_cancel').onclick=()=>payModal.classList.remove('show');
+document.getElementById('m_confirm').onclick=completeSale;
+function completeSale(){
+  const t=calc();const b=balance();if(b.paid<t.total-0.001){alert('Amount paid is less than the total due.');return;}
+  const cashPaid=payLines.filter(l=>l.method==='Cash').reduce((s,l)=>s+(+l.amount||0),0);
+  const change=+(b.paid-t.total).toFixed(2);const methods=[...new Set(payLines.map(l=>l.method))];
+  const s=db.settings;const invNo=s.prefix+String(db.counter).padStart(5,'0');const full=t.total>=10000;
+  const txn={inv:invNo,ts:new Date().toISOString(),items:order.map(o=>({n:o.n,na:o.na,p:o.p,q:o.q})),
+    sub:t.sub,disc:t.disc,net:t.net,svc:t.svc,muni:t.muni,vat:t.vat,total:t.total,note:cur.note,discount:cur.discount,cashier:appCashier,payments:payLines.map(l=>({method:l.method,amount:+(+l.amount).toFixed(2)})),
+    pay:methods.length>1?'Split':(methods[0]||'Cash'),cash:cashPaid,change:change,
+    type:cur.type,table:cur.table,channel:cur.type==='Delivery'?cur.channel:'',
+    custName:full?document.getElementById('m_custName').value.trim():cur.custName,custPhone:cur.custPhone,custTrn:full?document.getElementById('m_custTrn').value.trim():'',full:full};
+  order.forEach(o=>{const m=db.menu.find(x=>x.n===o.n);if(m&&typeof m.s==='number')m.s=Math.max(0,m.s-o.q);});
+  db.txns.push(txn);db.counter++;save();buildReceipt(txn);payModal.classList.remove('show');window.print();resetOrder();renderGrid();
+}
+function buildReceipt(t){
+  const s=db.settings;const d=new Date(t.ts);const dt=d.toLocaleDateString('en-GB')+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  let items='';t.items.forEach(it=>{const ar=it.na?`<br><span class="ar" style="font-size:11px">${esc(it.na)}</span>`:'';items+=`<tr><td>${esc(it.n)}${ar}</td><td style="text-align:center">${it.q}</td><td style="text-align:right">${num(it.p)}</td><td style="text-align:right">${num(it.p*it.q)}</td></tr>`;});
+  let charges=`<div class="r"><span>Subtotal (excl. VAT)</span><span>${num(t.sub)}</span></div>`;
+  if(t.disc>0)charges+=`<div class="r"><span>Discount</span><span>- ${num(t.disc)}</span></div>`;
+  if(t.svc>0)charges+=`<div class="r"><span>Service Charge</span><span>${num(t.svc)}</span></div>`;
+  if(t.muni>0)charges+=`<div class="r"><span>Municipality Fee</span><span>${num(t.muni)}</span></div>`;
+  charges+=`<div class="r"><span>VAT (${s.vat}%)</span><span>${num(t.vat)}</span></div>`;
+  const cust=t.full?`<hr><div>Customer: ${esc(t.custName||'-')}</div><div>Customer TRN: ${esc(t.custTrn||'-')}</div>`:'';
+  let pays='';(t.payments||[]).forEach(p=>{pays+=`<div class="r"><span>${esc(p.method)}</span><span>${num(p.amount)}</span></div>`;});
+  if(t.change>0)pays+=`<div class="r"><span>Change</span><span>${num(t.change)}</span></div>`;
+  document.getElementById('rcBody').innerHTML=`${s.logo?`<div class="c"><img src="${s.logo}" style="max-height:52px;max-width:70%"></div>`:''}<div class="c b lg">${esc(s.name)}</div><div class="c ar b">${esc(s.nameAr||'')}</div><div class="c">${esc(s.addr)}</div><div class="c">Tel: ${esc(s.phone)}</div><div class="c b">TRN: ${esc(s.trn)}</div><hr><div class="c b">TAX INVOICE / فاتورة ضريبية</div><div class="r"><span>Invoice #</span><span>${esc(t.inv)}</span></div><div class="r"><span>Date</span><span>${dt}</span></div><div class="r"><span>Type</span><span>${esc(whereLabelRaw(t))}</span></div>${t.cashier?`<div class="r"><span>Served by</span><span>${esc(t.cashier)}</span></div>`:''}${t.custPhone?`<div class="r"><span>Customer</span><span>${esc(t.custName||'')} ${esc(t.custPhone)}</span></div>`:''}<hr><table><tr class="b"><td>Item</td><td style="text-align:center">Qty</td><td style="text-align:right">Price</td><td style="text-align:right">Total</td></tr>${items}</table><hr>${charges}<div class="r b lg" style="margin-top:4px"><span>TOTAL</span><span>${s.curr} ${num(t.total)}</span></div><hr>${pays}${cust}${t.note?`<hr><div>📝 ${esc(t.note)}</div>`:''}<hr><div class="c">All amounts in ${esc(s.curr)}. VAT included as shown.</div><div class="c b" style="margin-top:6px">Thank you! شكراً لكم</div>`;
+}
+/* Dashboard */
+function renderDash(){
+  const tx=db.txns.filter(t=>t.ts.slice(0,10)===todayStr()&&!t.void);
+  const sales=tx.reduce((s,t)=>s+t.total,0);const orders=tx.length;const avg=orders?sales/orders:0;const vat=tx.reduce((s,t)=>s+t.vat,0);
+  const inKitchen=db.kds.filter(t=>t.status!=='ready').length;
+  document.getElementById('kpis').innerHTML=`
+    <div class="kpi"><div class="lbl">💰 ${T('kpi_sales')}</div><div class="val">${num(sales)}</div></div>
+    <div class="kpi"><div class="lbl">🧾 ${T('kpi_orders')}</div><div class="val">${orders}</div></div>
+    <div class="kpi"><div class="lbl">📊 ${T('kpi_avg')}</div><div class="val small">${num(avg)}</div></div>
+    <div class="kpi"><div class="lbl">🧮 ${T('kpi_vat')}</div><div class="val small">${num(vat)}</div></div>
+    <div class="kpi"><div class="lbl">🍳 ${T('kpi_kitchen')}</div><div class="val">${inKitchen}</div></div>`;
+  // channel bars
+  const seg={};tx.forEach(t=>{const k=segOf(t);seg[k]=(seg[k]||0)+t.total;});
+  const segs=Object.entries(seg).sort((a,b)=>b[1]-a[1]);const max=segs.length?segs[0][1]:0;
+  document.getElementById('chanBars').innerHTML=segs.length?segs.map(([k,v])=>{
+    const col=CHANCOLOR[k]||'var(--brand)';const pct=max?Math.max(4,v/max*100):0;
+    return `<div class="bar"><div class="bl"><span class="chdot" style="background:${col}"></span>${esc(k)}</div><div class="bt"><div class="bf" style="width:${pct}%;background:${col}"></div></div><div class="bv">${num(v)}</div></div>`;
+  }).join(''):`<div class="empty">${lang==='ar'?'لا مبيعات اليوم بعد':'No sales yet today.'}</div>`;
+  // top items
+  const im={};tx.forEach(t=>t.items.forEach(it=>{im[it.n]=im[it.n]||{q:0,v:0};im[it.n].q+=it.q;im[it.n].v+=it.p*it.q;}));
+  const top=Object.entries(im).sort((a,b)=>b[1].q-a[1].q).slice(0,6);const tmax=top.length?top[0][1].q:0;
+  document.getElementById('topItems').innerHTML=top.length?top.map(([n,v])=>{
+    const pct=tmax?Math.max(6,v.q/tmax*100):0;
+    return `<div class="bar"><div class="bl">${esc(n)}</div><div class="bt"><div class="bf" style="width:${pct}%"></div></div><div class="bv">${v.q} · ${num(v.v)}</div></div>`;
+  }).join(''):`<div class="empty">${lang==='ar'?'لا بيانات':'No data yet.'}</div>`;
+  // live feed
+  const feed=[...tx].reverse().slice(0,9);
+  document.getElementById('liveFeed').innerHTML=feed.length?feed.map(t=>{
+    const d=new Date(t.ts);const col=CHANCOLOR[segOf(t)]||'var(--brand)';
+    return `<div class="feedrow"><span class="chdot" style="background:${col}"></span><div class="fi">${esc(t.inv)} <span class="pill">${esc(whereLabelRaw(t))}</span><small>${d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})} · ${t.pay} · ${t.items.reduce((a,i)=>a+i.q,0)} items</small></div><div class="fa">${money(t.total)}</div></div>`;
+  }).join(''):`<div class="empty">${lang==='ar'?'لا طلبات اليوم بعد. سجّل أول عملية بيع!':'No orders yet today. Ring up your first sale in the Register!'}</div>`;
+}
+/* Customers CRM */
+function crmData(){
+  const cm={};db.txns.forEach(t=>{if(t.custPhone&&!t.void){const k=t.custPhone;cm[k]=cm[k]||{name:'',visits:0,spend:0,last:''};cm[k].visits++;cm[k].spend+=t.total;if(t.custName)cm[k].name=t.custName;if(t.ts>cm[k].last)cm[k].last=t.ts;}});
+  return Object.entries(cm).map(([ph,v])=>({phone:ph,...v})).sort((a,b)=>b.spend-a.spend);
+}
+function renderCustomers(){
+  const q=(document.getElementById('custSearch').value||'').toLowerCase();
+  const rows=crmData().filter(c=>!q||(c.name.toLowerCase().includes(q)||c.phone.includes(q)));
+  document.getElementById('crmTable').innerHTML='<tr><th>Customer</th><th>Phone</th><th class="num">Visits</th><th class="num">Total spend</th><th class="num">Loyalty pts</th><th>Last visit</th></tr>'+
+    (rows.length?rows.map(c=>`<tr><td>${esc(c.name||'-')}</td><td>${esc(c.phone)}</td><td class="num">${c.visits}</td><td class="num">${num(c.spend)}</td><td class="num">${Math.floor(c.spend)}</td><td>${c.last?new Date(c.last).toLocaleDateString('en-GB'):'-'}</td></tr>`).join(''):'<tr><td colspan="6" class="empty">No customers captured yet. Add a phone number on takeaway/delivery orders.</td></tr>');
+}
+document.getElementById('custSearch').oninput=renderCustomers;
+/* Reports */
+let repFilter='date';
+function repTxns(){if(repFilter==='all')return db.txns;const dstr=document.getElementById('repDate').value;return db.txns.filter(t=>t.ts.slice(0,10)===dstr);}
+function payTotals(txns){const p={};txns.forEach(t=>{(t.payments||[{method:t.pay,amount:t.total}]).forEach(x=>{p[x.method]=(p[x.method]||0)+x.amount;});if(t.change)p.Cash=(p.Cash||0)-t.change;});return p;}
+function renderReports(){
+  const all=repTxns();const txns=all.filter(t=>!t.void);
+  const sum=txns.reduce((a,t)=>{a.total+=t.total;a.vat+=t.vat;a.sub+=t.sub;a.disc+=(t.disc||0);a.svc+=t.svc;a.muni+=t.muni;return a;},{total:0,vat:0,sub:0,disc:0,svc:0,muni:0});
+  document.getElementById('repStats').innerHTML=`<div class="stat"><div class="lbl">Transactions</div><div class="val">${txns.length}</div></div><div class="stat"><div class="lbl">Gross Sales</div><div class="val">${num(sum.total)}</div></div><div class="stat"><div class="lbl">Net (excl. VAT)</div><div class="val">${num(sum.sub-sum.disc+sum.svc+sum.muni)}</div></div><div class="stat"><div class="lbl">Discounts</div><div class="val">${num(sum.disc)}</div></div><div class="stat"><div class="lbl">VAT Collected</div><div class="val">${num(sum.vat)}</div></div>`;
+  const p=payTotals(txns);let payRows='<tr><th>Method</th><th class="num">Net (AED)</th></tr>';let ptot=0;
+  Object.keys(p).forEach(m=>{if(Math.abs(p[m])>0.001){payRows+=`<tr><td>${m}</td><td class="num">${num(p[m])}</td></tr>`;ptot+=p[m];}});
+  payRows+=`<tr><td><b>Total</b></td><td class="num"><b>${num(ptot)}</b></td></tr>`;document.getElementById('payTable').innerHTML=payRows;
+  const ty={};txns.forEach(t=>{const k=t.type||'Dine-in';ty[k]=ty[k]||{n:0,v:0};ty[k].n++;ty[k].v+=t.total;});
+  document.getElementById('typeTable').innerHTML='<tr><th>Type</th><th class="num">Orders</th><th class="num">Sales</th></tr>'+(Object.keys(ty).length?['Dine-in','Takeaway','Delivery'].filter(k=>ty[k]).map(k=>`<tr><td>${k}</td><td class="num">${ty[k].n}</td><td class="num">${num(ty[k].v)}</td></tr>`).join(''):'<tr><td colspan="3" class="empty">No sales.</td></tr>');
+  const ch={};txns.filter(t=>t.type==='Delivery').forEach(t=>{const k=t.channel||'—';ch[k]=ch[k]||{n:0,v:0};ch[k].n++;ch[k].v+=t.total;});
+  document.getElementById('chanTable').innerHTML='<tr><th>Channel</th><th class="num">Orders</th><th class="num">Sales</th><th class="num">Comm.</th><th class="num">Net</th></tr>'+(Object.keys(ch).length?Object.entries(ch).sort((a,b)=>b[1].v-a[1].v).map(([k,v])=>{const cm=v.v*chanCommission(k)/100;return `<tr><td>${esc(k)}</td><td class="num">${v.n}</td><td class="num">${num(v.v)}</td><td class="num">${num(cm)}</td><td class="num">${num(v.v-cm)}</td></tr>`;}).join(''):'<tr><td colspan="5" class="empty">No delivery orders.</td></tr>');
+  const im={};txns.forEach(t=>t.items.forEach(it=>{im[it.n]=im[it.n]||{q:0,v:0};im[it.n].q+=it.q;im[it.n].v+=it.p*it.q;}));
+  const rows=Object.entries(im).sort((a,b)=>b[1].v-a[1].v);
+  document.getElementById('itemTable').innerHTML='<tr><th>Item</th><th class="num">Qty</th><th class="num">Sales</th></tr>'+(rows.length?rows.map(([n,v])=>`<tr><td>${esc(n)}</td><td class="num">${v.q}</td><td class="num">${num(v.v)}</td></tr>`).join(''):'<tr><td colspan="3" class="empty">No sales.</td></tr>');
+  const tracked=db.menu.filter(m=>typeof m.s==='number').sort((a,b)=>a.s-b.s);
+  document.getElementById('stockTable').innerHTML='<tr><th>Item</th><th class="num">In stock</th><th>Status</th></tr>'+(tracked.length?tracked.map(m=>`<tr><td>${esc(m.n)}</td><td class="num">${m.s}</td><td style="color:${m.s<=0?'var(--danger)':m.s<=LOW?'#b9761b':'var(--accent)'}">${m.s<=0?'Out':m.s<=LOW?'Low':'OK'}</td></tr>`).join(''):'<tr><td colspan="3" class="empty">No tracked items.</td></tr>');
+  document.getElementById('txnTable').innerHTML='<tr><th>Invoice</th><th>Time</th><th>Type</th><th>Cashier</th><th>Pay</th><th class="num">Total</th><th></th></tr>'+(all.length?[...all].reverse().map(t=>{const d=new Date(t.ts);return `<tr class="${t.void?'voided':''}"><td>${esc(t.inv)}</td><td>${d.toLocaleString('en-GB',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'})}</td><td>${esc(whereLabelRaw(t))}</td><td>${esc(t.cashier||'')}</td><td>${esc(t.pay)}${t.void?' · VOID':''}</td><td class="num">${num(t.total)}</td><td><button class="miniBtn" onclick="reprint('${t.inv}')">🖨</button> ${t.void?'':`<button class="voidBtn" onclick="voidTxn('${t.inv}')" title="Void">🗑</button>`}</td></tr>`;}).join(''):'<tr><td colspan="7" class="empty">No transactions.</td></tr>');
+}
+window.reprint=function(inv){const t=db.txns.find(x=>x.inv===inv);if(t){buildReceipt(t);window.print();}};
+window.voidTxn=function(inv){const t=db.txns.find(x=>x.inv===inv);if(!t||t.void)return;
+  const reasons=db.reasons||[];const reason=reasons.length?prompt('Void reason ('+reasons.join(' / ')+'):',reasons[0]):prompt('Void reason:');
+  if(reason===null)return;t.void=true;t.voidReason=reason||'';save();renderReports();};
+document.getElementById('repToday').onclick=()=>{repFilter='date';document.getElementById('repDate').value=todayStr();renderReports();};
+document.getElementById('repAll').onclick=()=>{repFilter='all';renderReports();};
+document.getElementById('repDate').onchange=()=>{repFilter='date';renderReports();};
+document.getElementById('printZ').onclick=printZ;
+function printZ(){
+  const txns=repTxns();const sum=txns.reduce((a,t)=>{a.total+=t.total;a.vat+=t.vat;a.sub+=t.sub;a.disc+=(t.disc||0);a.svc+=t.svc;a.muni+=t.muni;return a;},{total:0,vat:0,sub:0,disc:0,svc:0,muni:0});
+  const p=payTotals(txns);const s=db.settings;const label=repFilter==='all'?'ALL TIME':document.getElementById('repDate').value;
+  let payr='';Object.keys(p).forEach(m=>{if(Math.abs(p[m])>0.001)payr+=`<div class="r"><span>${m}</span><span>${num(p[m])}</span></div>`;});
+  const ty={};txns.forEach(t=>{const k=t.type||'Dine-in';ty[k]=(ty[k]||0)+t.total;});let tyr='';['Dine-in','Takeaway','Delivery'].forEach(k=>{if(ty[k])tyr+=`<div class="r"><span>${k}</span><span>${num(ty[k])}</span></div>`;});
+  document.getElementById('rcBody').innerHTML=`<div class="c b lg">${esc(s.name)}</div><div class="c b">TRN: ${esc(s.trn)}</div><hr><div class="c b">Z-REPORT / تقرير المبيعات</div><div class="r"><span>Period</span><span>${esc(label)}</span></div><div class="r"><span>Printed</span><span>${new Date().toLocaleString('en-GB')}</span></div><hr><div class="r"><span>Transactions</span><span>${txns.length}</span></div><div class="r"><span>Gross items</span><span>${num(sum.sub)}</span></div>${sum.disc?`<div class="r"><span>Discounts</span><span>- ${num(sum.disc)}</span></div>`:''}<div class="r"><span>Net Sales (excl VAT)</span><span>${num(sum.sub-sum.disc+sum.svc+sum.muni)}</span></div>${sum.svc?`<div class="r"><span>Service Charge</span><span>${num(sum.svc)}</span></div>`:''}${sum.muni?`<div class="r"><span>Municipality Fee</span><span>${num(sum.muni)}</span></div>`:''}<div class="r"><span>VAT Collected</span><span>${num(sum.vat)}</span></div><div class="r b lg"><span>GROSS TOTAL</span><span>${num(sum.total)}</span></div><hr><div class="c b">By type</div>${tyr}<hr><div class="c b">By payment</div>${payr}<hr><div class="c">${esc(s.curr)} — End of report</div>`;
+  window.print();
+}
+document.getElementById('exportCsv').onclick=()=>{
+  const txns=repTxns();let csv='Invoice,Date,Time,Type,Channel,Payment,Customer,Phone,Subtotal,Discount,Service,Municipality,VAT,Total,Currency,Note\n';
+  txns.forEach(t=>{const d=new Date(t.ts);csv+=[t.inv,d.toLocaleDateString('en-GB'),d.toLocaleTimeString('en-GB'),t.type||'',t.channel||'',t.pay,'"'+(t.custName||'')+'"','"'+(t.custPhone||'')+'"',num(t.sub),num(t.disc||0),num(t.svc),num(t.muni),num(t.vat),num(t.total),db.settings.curr,'"'+((t.note||'').replace(/"/g,"'"))+'"'].join(',')+'\n';});
+  download(csv,'text/csv','sales_'+(document.getElementById('repDate').value||'all')+'.csv');
+};
+document.getElementById('exportJson').onclick=()=>{
+  const s=db.settings;const txns=repTxns();
+  const out=txns.map(t=>({invoiceType:t.full?'Full Tax Invoice':'Simplified Tax Invoice',invoiceNumber:t.inv,issueDateTime:t.ts,currency:s.curr,orderType:t.type,deliveryChannel:t.channel||null,seller:{name:s.name,nameAr:s.nameAr,address:s.addr,trn:s.trn},buyer:(t.full||t.custPhone)?{name:t.custName||null,trn:t.custTrn||null,phone:t.custPhone||null}:null,lineItems:t.items.map(it=>({description:it.n,descriptionAr:it.na||null,quantity:it.q,unitPrice:+it.p.toFixed(2),lineNet:+(it.p*it.q).toFixed(2)})),charges:{discount:+(t.disc||0).toFixed(2),serviceCharge:+t.svc.toFixed(2),municipalityFee:+t.muni.toFixed(2)},tax:{vatRatePct:+s.vat,vatAmount:+t.vat.toFixed(2)},totals:{netExclVat:+((t.net!=null?t.net:t.sub)+t.svc+t.muni).toFixed(2),grandInclVat:+t.total.toFixed(2)},note:t.note||null,payments:t.payments}));
+  download(JSON.stringify({generatedAt:new Date().toISOString(),count:out.length,invoices:out},null,2),'application/json','einvoices_'+(document.getElementById('repDate').value||'all')+'.json');
+};
+function download(data,type,name){const blob=new Blob([data],{type});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();}
+/* ===== Setup hub ===== */
+let appCashier=(db.staff&&db.staff[0]?db.staff[0].name:'')||'';
+const SETUP_TILES=[
+  {k:'profile',ic:'🏪',label:{en:'Business Profile',ar:'ملف المنشأة'}},
+  {k:'taxes',ic:'🧮',label:{en:'Taxes & Charges',ar:'الضرائب والرسوم'}},
+  {k:'menu',ic:'🍴',label:{en:'Menu & Categories',ar:'القائمة والفئات'}},
+  {k:'pay',ic:'💳',label:{en:'Payment Types',ar:'طرق الدفع'}},
+  {k:'disc',ic:'﹪',label:{en:'Discounts',ar:'الخصومات'}},
+  {k:'staff',ic:'👥',label:{en:'Staff & Roles',ar:'الموظفون والصلاحيات'}},
+  {k:'channels',ic:'🛵',label:{en:'Delivery Channels',ar:'منصات التوصيل'}},
+  {k:'reasons',ic:'🗒️',label:{en:'Order Reasons',ar:'أسباب الإلغاء'}},
+  {k:'lang',ic:'🌐',label:{en:'Language',ar:'اللغة'}}
+];
+function loadSettings(){renderSetupHub();}
+function renderSetupHub(){
+  document.getElementById('setupHub').style.display='';
+  document.getElementById('setupPanel').style.display='none';
+  const s=db.settings;const lb=document.getElementById('bizLogoBox');
+  lb.innerHTML=s.logo?`<img src="${s.logo}" alt="logo">`:'<span>NO LOGO</span>';
+  document.getElementById('setupBizName').textContent=s.name||'My Restaurant';
+  document.getElementById('setupBizFacts').innerHTML=`<span>📞 ${esc(s.phone||'')}</span><span>🧾 TRN ${esc(s.trn||'')}</span><span>💱 ${esc(s.curr||'AED')}</span><span>⏰ ${esc(s.endOfDay||'')}</span>`;
+  const w=document.getElementById('setupTiles');w.innerHTML='';
+  SETUP_TILES.forEach(t=>{const b=document.createElement('button');b.className='setupTile';b.innerHTML=`<span class="ti">${t.ic}</span><span>${t.label[lang]||t.label.en}</span>`;b.onclick=()=>openPanel(t.k);w.appendChild(b);});
+}
+function openPanel(k){
+  document.getElementById('setupHub').style.display='none';
+  document.getElementById('setupPanel').style.display='';
+  const t=SETUP_TILES.find(x=>x.k===k);document.getElementById('panelTitle').textContent=t.label[lang]||t.label.en;
+  ({profile:pProfile,taxes:pTaxes,menu:pMenu,pay:pPay,disc:pDisc,staff:pStaff,channels:pChan,reasons:pReasons,lang:pLang}[k])(document.getElementById('panelBody'));
+}
+document.getElementById('setupBack').onclick=renderSetupHub;
+function flash(){const m=document.getElementById('savedMsg');m.textContent='✓ Saved';setTimeout(()=>m.textContent='',1800);}
+function saveAll(){save();flash();refreshChrome();}
+function pProfile(b){const s=db.settings;
+  b.innerHTML=`<div class="card"><div class="two"><div class="field"><label>Business name (English)</label><input id="p_name" value="${esc(s.name)}"></div><div class="field"><label>Business name (Arabic)</label><input id="p_nameAr" dir="rtl" value="${esc(s.nameAr||'')}"></div></div><div class="field"><label>Address</label><input id="p_addr" value="${esc(s.addr)}"></div><div class="two"><div class="field"><label>TRN</label><input id="p_trn" maxlength="15" value="${esc(s.trn)}"></div><div class="field"><label>Phone</label><input id="p_phone" value="${esc(s.phone)}"></div></div><div class="two"><div class="field"><label>Currency</label><input id="p_curr" value="${esc(s.curr)}"></div><div class="field"><label>Invoice prefix</label><input id="p_prefix" value="${esc(s.prefix)}"></div></div><div class="two"><div class="field"><label>End of business day</label><input id="p_eod" value="${esc(s.endOfDay||'')}"></div><div class="field"><label>Logo (shows on receipt)</label><input id="p_logo" type="file" accept="image/*"></div></div><button class="saveBtn" id="p_save">Save</button></div>`;
+  document.getElementById('p_logo').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{db.settings.logo=rd.result;save();flash();};rd.readAsDataURL(f);};
+  document.getElementById('p_save').onclick=()=>{const g=id=>document.getElementById(id).value;Object.assign(db.settings,{name:g('p_name'),nameAr:g('p_nameAr'),addr:g('p_addr'),trn:g('p_trn'),phone:g('p_phone'),curr:g('p_curr')||'AED',prefix:g('p_prefix'),endOfDay:g('p_eod')});saveAll();};
+}
+function pTaxes(b){const s=db.settings;
+  b.innerHTML=`<div class="card"><div class="three"><div class="field"><label>VAT rate (%)</label><input id="t_vat" type="number" step="0.1" value="${s.vat}"><span class="hint">UAE standard 5%.</span></div><div class="field"><label>Service charge (%)</label><input id="t_svc" type="number" step="0.1" value="${s.service}"></div><div class="field"><label>Municipality fee (%)</label><input id="t_muni" type="number" step="0.1" value="${s.muni}"></div></div><button class="saveBtn" id="t_save">Save</button></div>`;
+  document.getElementById('t_save').onclick=()=>{db.settings.vat=parseFloat(document.getElementById('t_vat').value||0);db.settings.service=parseFloat(document.getElementById('t_svc').value||0);db.settings.muni=parseFloat(document.getElementById('t_muni').value||0);saveAll();};
+}
+function pMenu(b){
+  b.innerHTML=`<div class="card"><div class="mitem"><span class="mh">Name (EN)</span><span class="mh">Name (AR)</span><span class="mh">Category</span><span class="mh">Price</span><span class="mh">Stock</span><span></span></div><div id="menuEditor"></div><div class="addRow"><button id="addMenuItem">+ Add item</button></div></div>`;
+  renderMenuEditor();
+  document.getElementById('addMenuItem').onclick=()=>{db.menu.push({n:'New Item',na:'',c:cats()[0]||'Main',p:0,s:null});save();renderMenuEditor();};
+}
+function renderMenuEditor(){
+  const w=document.getElementById('menuEditor');if(!w)return;w.innerHTML='';
+  db.menu.forEach((m,i)=>{const r=document.createElement('div');r.className='mitem';
+    r.innerHTML=`<input value="${esc(m.n)}" data-i="${i}" data-k="n"><input value="${esc(m.na||'')}" data-i="${i}" data-k="na" dir="rtl"><input value="${esc(m.c)}" data-i="${i}" data-k="c"><input value="${m.p}" data-i="${i}" data-k="p" type="number" step="0.01"><input value="${m.s==null?'':m.s}" data-i="${i}" data-k="s" type="number" step="1" placeholder="—"><button data-del="${i}">✕</button>`;
+    w.appendChild(r);});
+  w.querySelectorAll('input').forEach(inp=>inp.onchange=()=>{const i=+inp.dataset.i,k=inp.dataset.k;if(k==='p')db.menu[i].p=parseFloat(inp.value||0);else if(k==='s')db.menu[i].s=inp.value===''?null:parseInt(inp.value);else db.menu[i][k]=inp.value;save();});
+  w.querySelectorAll('button[data-del]').forEach(bt=>bt.onclick=()=>{db.menu.splice(+bt.dataset.del,1);save();renderMenuEditor();});
+}
+function pPay(b){
+  b.innerHTML=`<div class="card"><p class="hint" style="margin-bottom:12px">Turn methods on/off or add your own. These appear on the Charge screen.</p><div id="payEditor"></div><div class="addRow"><button id="addPay">+ Add payment type</button></div></div>`;
+  renderPayEditor();document.getElementById('addPay').onclick=()=>{db.payTypes.push({name:'New',icon:'💠',on:true});save();renderPayEditor();renderPaytypeButtons();};
+}
+function renderPayEditor(){const w=document.getElementById('payEditor');w.innerHTML='';
+  db.payTypes.forEach((p,i)=>{const r=document.createElement('div');r.className='mitem';r.style.gridTemplateColumns='.6fr 2fr auto auto';
+    r.innerHTML=`<input value="${esc(p.icon)}" data-i="${i}" data-k="icon"><input value="${esc(p.name)}" data-i="${i}" data-k="name"><label style="font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px"><input type="checkbox" data-i="${i}" data-k="on" ${p.on?'checked':''}> on</label><button data-del="${i}">✕</button>`;w.appendChild(r);});
+  w.querySelectorAll('input[data-k="icon"],input[data-k="name"]').forEach(inp=>inp.onchange=()=>{db.payTypes[+inp.dataset.i][inp.dataset.k]=inp.value;save();renderPaytypeButtons();});
+  w.querySelectorAll('input[data-k="on"]').forEach(inp=>inp.onchange=()=>{db.payTypes[+inp.dataset.i].on=inp.checked;save();renderPaytypeButtons();});
+  w.querySelectorAll('button[data-del]').forEach(bt=>bt.onclick=()=>{db.payTypes.splice(+bt.dataset.del,1);save();renderPayEditor();renderPaytypeButtons();});
+}
+function pDisc(b){
+  b.innerHTML=`<div class="card"><p class="hint" style="margin-bottom:12px">Preset discounts appear as quick buttons on the Discount screen.</p><div id="discEditor"></div><div class="addRow"><button id="addDisc">+ Add discount</button></div></div>`;
+  renderDiscEditor();document.getElementById('addDisc').onclick=()=>{db.discounts.push({label:'New discount',type:'pct',value:10});save();renderDiscEditor();};
+}
+function renderDiscEditor(){const w=document.getElementById('discEditor');w.innerHTML='';
+  db.discounts.forEach((d,i)=>{const r=document.createElement('div');r.className='mitem';r.style.gridTemplateColumns='2fr 1fr 1fr auto';
+    r.innerHTML=`<input value="${esc(d.label)}" data-i="${i}" data-k="label"><select data-i="${i}" data-k="type"><option value="pct" ${d.type==='pct'?'selected':''}>%</option><option value="amt" ${d.type==='amt'?'selected':''}>AED</option></select><input value="${d.value}" data-i="${i}" data-k="value" type="number" step="0.01"><button data-del="${i}">✕</button>`;w.appendChild(r);});
+  w.querySelectorAll('input,select').forEach(inp=>inp.onchange=()=>{const d=db.discounts[+inp.dataset.i],k=inp.dataset.k;d[k]=k==='value'?parseFloat(inp.value||0):inp.value;save();});
+  w.querySelectorAll('button[data-del]').forEach(bt=>bt.onclick=()=>{db.discounts.splice(+bt.dataset.del,1);save();renderDiscEditor();});
+}
+function pStaff(b){
+  b.innerHTML=`<div class="card"><h3 style="margin-bottom:10px">Roles</h3><div id="roleList" style="margin-bottom:8px"></div><div class="addRow"><button id="addRole">+ Add role</button></div></div><div class="card"><h3 style="margin-bottom:10px">Staff</h3><div class="mitem" style="grid-template-columns:2fr 1.4fr 1fr auto"><span class="mh">Name</span><span class="mh">Role</span><span class="mh">PIN</span><span></span></div><div id="staffEditor"></div><div class="addRow"><button id="addStaff">+ Add staff</button></div></div>`;
+  renderRoleList();renderStaffEditor();
+  document.getElementById('addRole').onclick=()=>{const n=prompt('New role name');if(n){db.roles.push(n);save();renderRoleList();renderStaffEditor();}};
+  document.getElementById('addStaff').onclick=()=>{db.staff.push({name:'New',role:db.roles[0]||'Cashier',pin:'0000'});save();renderStaffEditor();renderCashierSel();};
+}
+function renderRoleList(){const w=document.getElementById('roleList');w.innerHTML=db.roles.map((r,i)=>`<span class="chipTag">${esc(r)} <b data-del="${i}">✕</b></span>`).join(' ');
+  w.querySelectorAll('b[data-del]').forEach(x=>x.onclick=()=>{db.roles.splice(+x.dataset.del,1);save();renderRoleList();});}
+function renderStaffEditor(){const w=document.getElementById('staffEditor');w.innerHTML='';
+  db.staff.forEach((st,i)=>{const r=document.createElement('div');r.className='mitem';r.style.gridTemplateColumns='2fr 1.4fr 1fr auto';
+    const opts=db.roles.map(ro=>`<option ${ro===st.role?'selected':''}>${esc(ro)}</option>`).join('');
+    r.innerHTML=`<input value="${esc(st.name)}" data-i="${i}" data-k="name"><select data-i="${i}" data-k="role">${opts}</select><input value="${esc(st.pin)}" data-i="${i}" data-k="pin" maxlength="4"><button data-del="${i}">✕</button>`;w.appendChild(r);});
+  w.querySelectorAll('input,select').forEach(inp=>inp.onchange=()=>{db.staff[+inp.dataset.i][inp.dataset.k]=inp.value;save();renderCashierSel();});
+  w.querySelectorAll('button[data-del]').forEach(bt=>bt.onclick=()=>{db.staff.splice(+bt.dataset.del,1);save();renderStaffEditor();renderCashierSel();});}
+function renderCashierSel(){const sel=document.getElementById('cashierSel');if(!sel)return;
+  if(!db.staff.find(s=>s.name===appCashier))appCashier=(db.staff[0]||{}).name||'';
+  sel.innerHTML=db.staff.length?db.staff.map(s=>`<option ${s.name===appCashier?'selected':''}>${esc(s.name)}</option>`).join(''):'<option>—</option>';
+  sel.onchange=()=>{appCashier=sel.value;};}
+function pChan(b){
+  b.innerHTML=`<div class="card"><p class="hint" style="margin-bottom:12px">Delivery platforms and their commission %. Reports show sales after commission.</p><div class="mitem" style="grid-template-columns:2fr 1fr auto"><span class="mh">Channel</span><span class="mh">Commission %</span><span></span></div><div id="chanEditor"></div><div class="addRow"><button id="addChan">+ Add channel</button></div></div>`;
+  renderChanEditor();document.getElementById('addChan').onclick=()=>{db.channels.push({name:'New',commission:20});save();renderChanEditor();};
+}
+function renderChanEditor(){const w=document.getElementById('chanEditor');w.innerHTML='';
+  db.channels.forEach((c,i)=>{const r=document.createElement('div');r.className='mitem';r.style.gridTemplateColumns='2fr 1fr auto';
+    r.innerHTML=`<input value="${esc(c.name)}" data-i="${i}" data-k="name"><input value="${c.commission}" data-i="${i}" data-k="commission" type="number" step="0.1"><button data-del="${i}">✕</button>`;w.appendChild(r);});
+  w.querySelectorAll('input').forEach(inp=>inp.onchange=()=>{const c=db.channels[+inp.dataset.i],k=inp.dataset.k;c[k]=k==='commission'?parseFloat(inp.value||0):inp.value;save();});
+  w.querySelectorAll('button[data-del]').forEach(bt=>bt.onclick=()=>{db.channels.splice(+bt.dataset.del,1);save();renderChanEditor();});}
+function pReasons(b){
+  b.innerHTML=`<div class="card"><p class="hint" style="margin-bottom:12px">Reasons shown when you void a transaction (Reports → 🗑).</p><div id="reasonEditor"></div><div class="addRow"><button id="addReason">+ Add reason</button></div></div>`;
+  renderReasonEditor();document.getElementById('addReason').onclick=()=>{db.reasons.push('New reason');save();renderReasonEditor();};
+}
+function renderReasonEditor(){const w=document.getElementById('reasonEditor');w.innerHTML='';
+  db.reasons.forEach((rs,i)=>{const r=document.createElement('div');r.className='mitem';r.style.gridTemplateColumns='1fr auto';
+    r.innerHTML=`<input value="${esc(rs)}" data-i="${i}"><button data-del="${i}">✕</button>`;w.appendChild(r);});
+  w.querySelectorAll('input').forEach(inp=>inp.onchange=()=>{db.reasons[+inp.dataset.i]=inp.value;save();});
+  w.querySelectorAll('button[data-del]').forEach(bt=>bt.onclick=()=>{db.reasons.splice(+bt.dataset.del,1);save();renderReasonEditor();});}
+function pLang(b){
+  b.innerHTML=`<div class="card"><p class="hint" style="margin-bottom:12px">Default interface language. You can also toggle from the sidebar.</p><div class="ptoggle" style="max-width:320px"><button id="lang_en" class="${lang==='en'?'active':''}">English</button><button id="lang_ar" class="${lang==='ar'?'active':''}">العربية</button></div></div>`;
+  document.getElementById('lang_en').onclick=()=>{lang='en';db.settings.lang='en';save();applyLang();openPanel('lang');};
+  document.getElementById('lang_ar').onclick=()=>{lang='ar';db.settings.lang='ar';save();applyLang();openPanel('lang');};
+}
+/* Nav */
+let activeView='dash';
+document.querySelectorAll('#snav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#snav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  activeView=b.dataset.view;document.getElementById(activeView).classList.add('active');refreshActive();
+});
+function refreshActive(){
+  if(activeView==='dash')renderDash();
+  else if(activeView==='reports'){if(!document.getElementById('repDate').value)document.getElementById('repDate').value=todayStr();renderReports();}
+  else if(activeView==='settings')loadSettings();
+  else if(activeView==='kitchen')renderKDS();
+  else if(activeView==='customers')renderCustomers();
+}
+function refreshChrome(){
+  document.getElementById('appTitle').textContent=db.settings.name||'Restaurant POS';
+  document.getElementById('bizLabel').textContent='TRN '+db.settings.trn;
+  document.title=(db.settings.name||'Restaurant')+' — POS';
+  renderCashierSel();applyLang();refreshActive();
+}
+function tickClock(){const d=new Date();document.getElementById('clock').innerHTML=d.toLocaleDateString(lang==='ar'?'ar-AE':'en-GB',{weekday:'short',day:'2-digit',month:'short'})+' · '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}
+renderPaytypeButtons();refreshChrome();tickClock();
+setInterval(tickClock,10000);
+setInterval(()=>{if(activeView==='dash')renderDash();if(activeView==='kitchen')renderKDS();},20000);
+/* setup-hub build */
+</script>
+</body>
+</html>
