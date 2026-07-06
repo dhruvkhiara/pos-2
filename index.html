@@ -253,9 +253,9 @@ td.num,th.num{text-align:right}
     </div>
     <div id="registerForm" style="display:none">
       <input id="rg_email" placeholder="Your email" autocomplete="off">
-      <input id="rg_phone" placeholder="Phone (optional)">
-      <button class="authBtn" id="rg_btn">Request an account</button>
-      <div class="authSwitch" style="margin-top:10px">We'll review your request and email your login to that address.</div>
+      <input id="rg_pass" type="password" placeholder="Password (min 6 characters)">
+      <input id="rg_pass2" type="password" placeholder="Confirm password">
+      <button class="authBtn" id="rg_btn">Create account</button>
       <div class="authSwitch">Already have an account? <a id="toLogin">Sign in</a></div>
     </div>
   </div>
@@ -1094,102 +1094,105 @@ function refreshChrome(){
   renderCashierSel();applyLang();refreshActive();
 }
 function tickClock(){const d=new Date();document.getElementById('clock').innerHTML=d.toLocaleDateString(lang==='ar'?'ar-AE':'en-GB',{weekday:'short',day:'2-digit',month:'short'})+' · '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}
-/* ===== Account sign-in / request gate (accounts controlled by you) ===== */
+/* ===== Accounts via Supabase (self-service) + offline master ===== */
 const SESS_LS='pos_session';
-function _hash(s){let h=5381;for(let i=0;i<s.length;i++){h=(((h<<5)+h)+s.charCodeAt(i))>>>0;}return String(h);}
-window.mkpass=(p)=>{const h=_hash(String(p));console.log('Password hash for "'+p+'": '+h);return h;};
-/* Approved accounts — you control these.
-   To add a customer after they email you a request:
-     1) open this app, press F12, and in the Console type:  mkpass('theirPassword')
-     2) copy the number it prints
-     3) add a line to ACCOUNTS below:  {email:'their@email.com', pass:'THE_NUMBER'}
-     4) upload this index.html to your GitHub repo — their app will then accept that login.
-   To revoke access: delete their line and upload again. */
+const SB_URL='https://dnvknoogrndtubwqskqq.supabase.co';
+const SB_KEY='sb_publishable_taKbly1bKphG_8PEF4kUdA_fx4cTWlq';
 const TRIAL_HOURS=48;
-const ACCOUNTS=[
-  // Your master login — never expires:
-  {email:'lead@suncorpn.com', pass:_hash('suncorpn123'), unlimited:true}
-  // Trial customer (locks 48h after their first login):
-  // ,{email:'customer@example.com', pass:'PASTE_HASH_HERE'}
-  // Paid customer (no expiry) — add unlimited:true when they pay:
-  // ,{email:'paid@example.com', pass:'PASTE_HASH_HERE', unlimited:true}
-];
+// Paid / owner emails — these never expire. Add a paying customer's email here, then upload.
+const UNLIMITED_EMAILS=['lead@suncorpn.com'];
+function _hash(s){let h=5381;for(let i=0;i<s.length;i++){h=(((h<<5)+h)+s.charCodeAt(i))>>>0;}return String(h);}
+// Offline master login (works with no internet, never expires):
+const MASTER_ACCOUNTS=[{email:'lead@suncorpn.com', pass:_hash('suncorpn123')}];
+function isUnlimited(email){return UNLIMITED_EMAILS.indexOf((email||'').toLowerCase())!==-1;}
+function sbHeaders(){return {'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'};}
+async function sbPost(pathAndQuery,body){
+  const r=await fetch(SB_URL+'/auth/v1/'+pathAndQuery,{method:'POST',headers:sbHeaders(),body:JSON.stringify(body)});
+  let d={};try{d=await r.json();}catch(e){}
+  return {ok:r.ok,status:r.status,data:d};
+}
+let currentUser=null; // {email, createdAt, unlimited}
 function authError(m){const e=document.getElementById('authError');e.textContent=m||'';e.style.display=m?'block':'none';}
 function showAuth(which){
   document.getElementById('loginForm').style.display=which==='login'?'block':'none';
   document.getElementById('registerForm').style.display=which==='register'?'block':'none';
-  document.getElementById('authSub').textContent=which==='login'?'Sign in to your account':'Request a trial account';
+  document.getElementById('authSub').textContent=which==='login'?'Sign in to your account':'Create your account';
   authError('');
 }
 function enterApp(){document.getElementById('authGate').style.display='none';document.getElementById('trialGate').style.display='none';}
-let currentUser='';
-function acctOf(email){return ACCOUNTS.find(a=>a.email===email);}
-function trialInfo(email){
-  const a=acctOf(email);if(!a)return{expired:false};
-  if(a.unlimited)return{unlimited:true,expired:false};
-  const hours=a.trialHours||TRIAL_HOURS;const key='pos_trialstart_'+email;
-  let start=localStorage.getItem(key);
-  if(!start){start=String(Date.now());localStorage.setItem(key,start);}
-  const left=(parseInt(start)+hours*3600000)-Date.now();
-  return{unlimited:false,expired:left<=0,left:left,hours:hours};
-}
 function fmtLeft(ms){if(ms<=0)return'0';const h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000);return h>=24?(Math.floor(h/24)+'d '+(h%24)+'h'):(h+'h '+m+'m');}
+function trialLeft(){if(!currentUser||currentUser.unlimited)return Infinity;return new Date(currentUser.createdAt).getTime()+TRIAL_HOURS*3600000-Date.now();}
 function updateTrialBadge(){
   const b=document.getElementById('trialBadge');if(!b)return;
-  if(!currentUser){b.style.display='none';return;}
-  const t=trialInfo(currentUser);
-  if(t.unlimited){b.style.display='none';return;}
-  b.style.display='inline-block';b.textContent='⏳ Trial: '+fmtLeft(t.left)+' left';
-  b.style.color=t.left<6*3600000?'#b9761b':'var(--muted)';
+  if(!currentUser||currentUser.unlimited){b.style.display='none';return;}
+  const left=trialLeft();b.style.display='inline-block';b.textContent='⏳ Trial: '+fmtLeft(left)+' left';b.style.color=left<6*3600000?'#b9761b':'var(--muted)';
 }
-function showTrialEnded(){currentUser='';document.getElementById('authGate').style.display='none';document.getElementById('trialGate').style.display='flex';}
-function authSuccess(email){
-  const t=trialInfo(email);
-  if(t.expired){showTrialEnded();return;}
-  currentUser=email;enterApp();updateTrialBadge();
+function showTrialEnded(){currentUser=null;document.getElementById('authGate').style.display='none';document.getElementById('trialGate').style.display='flex';}
+function grantAccess(email,createdAt,unlimited){
+  currentUser={email:email,createdAt:createdAt,unlimited:unlimited};
+  if(!unlimited&&trialLeft()<=0){showTrialEnded();return;}
+  enterApp();updateTrialBadge();
 }
-function initAuth(){
-  try{const s=JSON.parse(localStorage.getItem(SESS_LS));if(s&&s.email&&ACCOUNTS.find(a=>a.email===s.email)){authSuccess(s.email);return;}}catch(e){}
+async function initAuth(){
   document.getElementById('authGate').style.display='flex';showAuth('login');
+  let s=null;try{s=JSON.parse(localStorage.getItem(SESS_LS));}catch(e){}
+  if(s&&s.type==='master'){grantAccess(s.email,null,true);return;}
+  if(s&&s.type==='sb'&&s.refresh_token){
+    try{
+      const res=await sbPost('token?grant_type=refresh_token',{refresh_token:s.refresh_token});
+      if(res.ok){const u=res.data.user||{};const createdAt=u.created_at||s.createdAt;localStorage.setItem(SESS_LS,JSON.stringify({type:'sb',refresh_token:res.data.refresh_token,email:s.email,createdAt:createdAt}));grantAccess(s.email,createdAt,isUnlimited(s.email));}
+      else{localStorage.removeItem(SESS_LS);}
+    }catch(e){if(s.createdAt){grantAccess(s.email,s.createdAt,isUnlimited(s.email));}}
+  }
 }
 document.getElementById('toRegister').onclick=()=>showAuth('register');
 document.getElementById('toLogin').onclick=()=>showAuth('login');
-document.getElementById('li_btn').onclick=()=>{
+document.getElementById('li_btn').onclick=async ()=>{
   const email=document.getElementById('li_email').value.trim().toLowerCase();
   const pass=document.getElementById('li_pass').value;
-  const a=ACCOUNTS.find(x=>x.email===email);
-  if(!a||a.pass!==_hash(pass)){authError('Wrong email or password.');return;}
-  if(document.getElementById('li_remember').checked)localStorage.setItem(SESS_LS,JSON.stringify({email}));
-  authSuccess(email);
+  if(!email||!pass){authError('Enter your email and password.');return;}
+  const m=MASTER_ACCOUNTS.find(a=>a.email===email);
+  if(m&&m.pass===_hash(pass)){if(document.getElementById('li_remember').checked)localStorage.setItem(SESS_LS,JSON.stringify({type:'master',email:email}));grantAccess(email,null,true);return;}
+  const btn=document.getElementById('li_btn');btn.disabled=true;btn.textContent='Signing in...';
+  try{
+    const res=await sbPost('token?grant_type=password',{email:email,password:pass});
+    if(!res.ok){authError(res.data.error_description||res.data.msg||'Wrong email or password.');return;}
+    const u=res.data.user||{};const createdAt=u.created_at||new Date().toISOString();
+    if(document.getElementById('li_remember').checked)localStorage.setItem(SESS_LS,JSON.stringify({type:'sb',refresh_token:res.data.refresh_token,email:email,createdAt:createdAt}));
+    grantAccess(email,createdAt,isUnlimited(email));
+  }catch(e){authError('No internet connection — please connect and try again.');}
+  finally{btn.disabled=false;btn.textContent='Sign in';}
 };
-const REQUEST_ENDPOINT='https://formspree.io/f/mwvdzkkn';
-document.getElementById('rg_btn').onclick=()=>{
-  const email=document.getElementById('rg_email').value.trim();
-  const phone=document.getElementById('rg_phone').value.trim();
+document.getElementById('rg_btn').onclick=async ()=>{
+  const email=document.getElementById('rg_email').value.trim().toLowerCase();
+  const p1=document.getElementById('rg_pass').value,p2=document.getElementById('rg_pass2').value;
   if(!/^\S+@\S+\.\S+$/.test(email)){authError('Please enter a valid email.');return;}
-  authError('');
-  const btn=document.getElementById('rg_btn');btn.disabled=true;btn.textContent='Sending...';
-  const fd=new FormData();
-  fd.append('email',email);fd.append('phone',phone);
-  fd.append('_subject','Restaurant POS - trial account request');
-  fd.append('message','New trial account request from '+email+(phone?(', phone '+phone):''));
-  fetch(REQUEST_ENDPOINT,{method:'POST',headers:{'Accept':'application/json'},body:fd})
-    .then(r=>{if(!r.ok)throw new Error('bad');
-      document.getElementById('registerForm').innerHTML='<div style="text-align:center;color:var(--brand);font-weight:700;margin-bottom:10px">Request sent ✓</div><div class="authSwitch">Thanks! We received your request and will email your login to <b>'+email+'</b> soon.</div><div class="authSwitch"><a id="toLogin2">Back to sign in</a></div>';
-    })
-    .catch(()=>{
-      document.getElementById('registerForm').innerHTML='<div class="authSwitch">Could not send automatically. Please email us at <b>lead@suncorpn.com</b> with your email and phone, and we will set up your login.</div><div class="authSwitch"><a id="toLogin2">Back to sign in</a></div>';
-    })
-    .finally(()=>{const t=document.getElementById('toLogin2');if(t)t.onclick=()=>location.reload();});
+  if(p1.length<6){authError('Password must be at least 6 characters.');return;}
+  if(p1!==p2){authError('Passwords do not match.');return;}
+  const btn=document.getElementById('rg_btn');btn.disabled=true;btn.textContent='Creating...';
+  try{
+    const res=await sbPost('signup',{email:email,password:p1});
+    if(!res.ok){authError(res.data.msg||res.data.error_description||'Could not create account.');return;}
+    if(res.data.access_token){
+      const u=res.data.user||{};const createdAt=u.created_at||new Date().toISOString();
+      localStorage.setItem(SESS_LS,JSON.stringify({type:'sb',refresh_token:res.data.refresh_token,email:email,createdAt:createdAt}));
+      grantAccess(email,createdAt,isUnlimited(email));
+    }else{
+      document.getElementById('registerForm').innerHTML='<div style="text-align:center;color:var(--brand);font-weight:700;margin-bottom:10px">Account created ✓</div><div class="authSwitch">Please check your email (<b>'+email+'</b>) to confirm your account, then sign in.</div><div class="authSwitch"><a id="toLogin2">Go to sign in</a></div>';
+      const t=document.getElementById('toLogin2');if(t)t.onclick=()=>location.reload();
+    }
+  }catch(e){authError('No internet connection — please connect and try again.');}
+  finally{btn.disabled=false;btn.textContent='Create account';}
 };
 document.getElementById('li_pass').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('li_btn').click();});
+document.getElementById('rg_pass2').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('rg_btn').click();});
 document.getElementById('logoutBtn').onclick=()=>{currentUser='';localStorage.removeItem(SESS_LS);document.getElementById('li_email').value='';document.getElementById('li_pass').value='';document.getElementById('trialGate').style.display='none';document.getElementById('authGate').style.display='flex';showAuth('login');};
 document.getElementById('trialEmailBtn').onclick=()=>window.open('mailto:lead@suncorpn.com?subject='+encodeURIComponent('Subscribe - Restaurant POS'));
 document.getElementById('trialSwitch').onclick=()=>{localStorage.removeItem(SESS_LS);document.getElementById('trialGate').style.display='none';document.getElementById('authGate').style.display='flex';document.getElementById('li_email').value='';document.getElementById('li_pass').value='';showAuth('login');};
 renderPaytypeButtons();refreshChrome();tickClock();initAuth();
 setInterval(tickClock,10000);
 setInterval(()=>{if(activeView==='dash')renderDash();if(activeView==='kitchen')renderKDS();},20000);
-setInterval(()=>{if(currentUser){const t=trialInfo(currentUser);if(t.expired)showTrialEnded();else updateTrialBadge();}},60000);
+setInterval(()=>{if(currentUser&&!currentUser.unlimited){if(trialLeft()<=0)showTrialEnded();else updateTrialBadge();}},60000);
 /* setup-hub build */
 </script>
 </body>
