@@ -1194,6 +1194,8 @@ setInterval(tickClock,10000);
 setInterval(()=>{if(activeView==='dash')renderDash();if(activeView==='kitchen')renderKDS();},20000);
 setInterval(()=>{if(currentUser&&!currentUser.unlimited){if(trialLeft()<=0)showTrialEnded();else updateTrialBadge();}},60000);
 /* setup-hub build */
+  window.addEventListener('beforeunload',function()
+{try{localStorage.removeItem('pos_session');}catch(e){}});
 </script>
 </body>
 </html>
