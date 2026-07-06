@@ -400,6 +400,11 @@ td.num,th.num{text-align:right}
     <button class="btn-ok" id="note_save" data-i18n="save">Save</button>
   </div>
 </div></div>
+<div class="overlay" id="askModal"><div class="modal">
+  <h3 id="askTitle">Enter</h3>
+  <div class="field"><input id="askInput" autocomplete="off"></div>
+  <div class="acts"><button class="btn-cancel" id="askCancel">Cancel</button><button class="btn-ok" id="askOk">OK</button></div>
+</div></div>
 <div id="receipt"><div class="rc" id="rcBody"></div></div>
 <script>
 const I18N={
@@ -470,12 +475,16 @@ function requirePerm(key,onOk){
   if(sessionUnlocked[key]){onOk();return;}
   const anyPinned=(db.staff||[]).some(s=>s.pin);
   if(!anyPinned){onOk();return;}
+  // Safety net: if no staff member can ever authorize this, don't lock everyone out.
+  const anyCan=(db.staff||[]).some(s=>s.pin&&roleHasPerm(s.role,key));
+  if(!anyCan){onOk();return;}
   const label=(PERMS.find(p=>p[0]===key)||[key,key])[1];
-  const pin=prompt('Enter staff PIN to authorize: '+label);
-  if(pin===null)return;
-  const st=(db.staff||[]).find(s=>String(s.pin)===String(pin));
-  if(st&&roleHasPerm(st.role,key)){sessionUnlocked[key]=true;onOk();}
-  else alert('Not authorized for: '+label);
+  askText('Enter staff PIN to authorize: '+label,(pin)=>{
+    if(pin===null)return;
+    const st=(db.staff||[]).find(s=>String(s.pin)===String(pin));
+    if(st&&roleHasPerm(st.role,key)){sessionUnlocked[key]=true;onOk();}
+    else alert('Not authorized for: '+label);
+  },{password:true});
 }
 let db=load();
 function load(){try{const d=JSON.parse(localStorage.getItem(LS));if(d&&d.settings){d.held=d.held||[];d.kds=d.kds||[];d.heldSeq=d.heldSeq||1;d.kdsSeq=d.kdsSeq||1;
@@ -510,6 +519,20 @@ function applyLang(){
 }
 document.getElementById('langBtn').onclick=()=>{lang=lang==='en'?'ar':'en';db.settings.lang=lang;save();applyLang();refreshActive();};
 document.getElementById('lockBtn').onclick=()=>{sessionUnlocked={};alert('Locked. Reports, Setup, voids and manager discounts will ask for a PIN again.');};
+// In-app replacement for prompt() (Electron does not support window.prompt)
+let _askCb=null;
+function askText(title,cb,opts){
+  opts=opts||{};
+  document.getElementById('askTitle').textContent=title;
+  const inp=document.getElementById('askInput');
+  inp.value=opts.value||'';inp.type=opts.password?'password':'text';
+  _askCb=cb;document.getElementById('askModal').classList.add('show');
+  setTimeout(()=>{inp.focus();inp.select();},50);
+}
+function _askDone(val){document.getElementById('askModal').classList.remove('show');const cb=_askCb;_askCb=null;if(cb)cb(val);}
+document.getElementById('askOk').onclick=()=>_askDone(document.getElementById('askInput').value);
+document.getElementById('askCancel').onclick=()=>_askDone(null);
+document.getElementById('askInput').addEventListener('keydown',e=>{if(e.key==='Enter')_askDone(document.getElementById('askInput').value);else if(e.key==='Escape')_askDone(null);});
 
 /* Menu */
 function cats(){return [...new Set(db.menu.map(m=>m.c))];}
@@ -826,8 +849,10 @@ function renderReports(){
 window.reprint=function(inv){const t=db.txns.find(x=>x.inv===inv);if(t){buildReceipt(t);window.print();}};
 window.voidTxn=function(inv){const t=db.txns.find(x=>x.inv===inv);if(!t||t.void)return;
   requirePerm('void',()=>{
-    const reasons=db.reasons||[];const reason=reasons.length?prompt('Void reason ('+reasons.join(' / ')+'):',reasons[0]):prompt('Void reason:');
-    if(reason===null)return;t.void=true;t.voidReason=reason||'';save();renderReports();
+    const reasons=db.reasons||[];
+    askText('Void reason'+(reasons.length?' ('+reasons.join(' / ')+')':''),(reason)=>{
+      if(reason===null)return;t.void=true;t.voidReason=reason||'';save();renderReports();
+    },{value:reasons[0]||''});
   });};
 document.getElementById('repToday').onclick=()=>{repFilter='date';document.getElementById('repDate').value=todayStr();renderReports();};
 document.getElementById('repAll').onclick=()=>{repFilter='all';renderReports();};
@@ -931,7 +956,7 @@ function renderDiscEditor(){const w=document.getElementById('discEditor');w.inne
 function pStaff(b){
   b.innerHTML=`<div class="card"><h3 style="margin-bottom:10px">Roles</h3><div id="roleList" style="margin-bottom:8px"></div><div class="addRow"><button id="addRole">+ Add role</button></div></div><div class="card"><h3 style="margin-bottom:10px">Staff</h3><div class="mitem" style="grid-template-columns:2fr 1.4fr 1fr auto"><span class="mh">Name</span><span class="mh">Role</span><span class="mh">PIN</span><span></span></div><div id="staffEditor"></div><div class="addRow"><button id="addStaff">+ Add staff</button></div></div>`;
   renderRoleList();renderStaffEditor();
-  document.getElementById('addRole').onclick=()=>{const n=prompt('New role name');if(n){db.roles.push(roleFromName(n));save();renderRoleList();renderStaffEditor();}};
+  document.getElementById('addRole').onclick=()=>{askText('New role name',(n)=>{if(n){db.roles.push(roleFromName(n));save();renderRoleList();renderStaffEditor();}});};
   document.getElementById('addStaff').onclick=()=>{db.staff.push({name:'New',role:(db.roles[0]&&db.roles[0].name)||'Cashier',pin:'0000'});save();renderStaffEditor();renderCashierSel();};
 }
 function renderRoleList(){
