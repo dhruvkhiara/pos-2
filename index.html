@@ -21,6 +21,8 @@ input:focus,select:focus{outline:none;border-color:var(--brand)}
 .sidebar{width:212px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;padding:16px 12px}
 .brand{display:flex;align-items:center;gap:10px;padding:6px 8px 16px;font-weight:800;font-size:18px;color:var(--brand)}
 .brand .dot{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--brand),var(--brand2));display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px}
+.brand .logoImg{width:72px;height:72px;border-radius:14px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;flex:0 0 auto}
+.brand .logoImg img{max-width:100%;max-height:100%;object-fit:contain}
 .snav{display:flex;flex-direction:column;gap:4px;margin-top:6px}
 .snav button{display:flex;align-items:center;gap:11px;background:transparent;color:var(--muted);padding:11px 12px;font-size:14.5px;font-weight:600;border-radius:10px;text-align:left;width:100%}
 .snav button .ic{font-size:17px;width:20px;text-align:center}
@@ -1223,7 +1225,7 @@ function refreshChrome(){
   document.title=(db.settings.name||'Restaurant')+' — POS';
   const bb=document.getElementById('brandBox');
   if(bb){const logo=db.settings.logo;const bt=(db.settings.brandText===undefined?'POS':db.settings.brandText);
-    bb.innerHTML=(logo?('<span class="dot" style="background:#fff;padding:2px"><img src="'+logo+'" alt="logo" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:6px"></span>'):'<span class="dot">🍽</span>')+(bt?('<span>'+esc(bt)+'</span>'):'');}
+    bb.innerHTML=(logo?('<span class="logoImg"><img src="'+logo+'" alt="logo"></span>'):'<span class="dot">🍽</span>')+(bt?('<span>'+esc(bt)+'</span>'):'');}
   renderCashierSel();applyLang();refreshActive();
 }
 function tickClock(){const d=new Date();document.getElementById('clock').innerHTML=d.toLocaleDateString(lang==='ar'?'ar-AE':'en-GB',{weekday:'short',day:'2-digit',month:'short'})+' · '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}
