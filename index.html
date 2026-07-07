@@ -125,7 +125,7 @@ textarea{font-family:inherit;width:100%;background:#fff;border:1px solid var(--l
 .totals .row.disc span{color:var(--accent)}
 .bizHeader{display:flex;gap:20px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:18px;max-width:900px}
 .bizLogo{width:110px;height:90px;border:1px dashed var(--line);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;overflow:hidden;flex:0 0 auto}
-.bizLogo img{max-width:100%;max-height:100%}
+.bizLogo img{max-width:100%;max-height:100%;object-fit:contain}
 .bizName{font-size:22px;font-weight:800;color:var(--brand)}
 .bizFacts{display:flex;flex-wrap:wrap;gap:16px;margin-top:8px;color:var(--muted);font-size:13px}
 .setupTiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;max-width:900px}
@@ -270,7 +270,7 @@ td.num,th.num{text-align:right}
 </div>
 <div class="app">
   <aside class="sidebar">
-    <div class="brand"><span class="dot">🍽</span><span>POS</span></div>
+    <div class="brand" id="brandBox"><span class="dot">🍽</span><span>POS</span></div>
     <nav class="snav" id="snav">
       <button data-view="dash" class="active"><span class="ic">📊</span><span data-i18n="nav_dash">Dashboard</span></button>
       <button data-view="pos"><span class="ic">🧾</span><span data-i18n="nav_register">Register</span></button>
@@ -484,7 +484,7 @@ const CHANNELS=['Talabat','Deliveroo','Zomato','Careem','Noon'];
 const CHANCOLOR={Talabat:'var(--tal)',Deliveroo:'var(--del)',Zomato:'var(--zom)',Careem:'var(--car)',Noon:'#caa500','Dine-in':'var(--brand)','Takeaway':'var(--purple)'};
 const PAYMETHODS=[['Cash','💵'],['Card','💳'],['Apple Pay','🍎'],['Google Pay','🅶'],['Samsung Pay','📱']];
 const defaults={
-  settings:{name:'My Restaurant',nameAr:'مطعمي',addr:'Dubai, United Arab Emirates',trn:'100000000000003',phone:'+971 4 000 0000',vat:5,service:0,muni:0,curr:'AED',prefix:'INV-',lang:'en',logo:'',endOfDay:'12:00 AM'},
+  settings:{name:'My Restaurant',nameAr:'مطعمي',addr:'Dubai, United Arab Emirates',trn:'100000000000003',phone:'+971 4 000 0000',vat:5,service:0,muni:0,curr:'AED',prefix:'INV-',lang:'en',logo:'',brandText:'POS',endOfDay:'12:00 AM'},
   payTypes:[{name:'Cash',icon:'💵',on:true},{name:'Card',icon:'💳',on:true},{name:'Apple Pay',icon:'🍎',on:true},{name:'Google Pay',icon:'🅶',on:true},{name:'Samsung Pay',icon:'📱',on:true}],
   discounts:[{label:'Staff Meal 20%',type:'pct',value:20},{label:'Loyalty 10%',type:'pct',value:10},{label:'AED 5 Off',type:'amt',value:5}],
   reasons:['Customer changed mind','Wrong order','Item out of stock','Kitchen delay','Duplicate order'],
@@ -545,7 +545,7 @@ function load(){try{const d=JSON.parse(localStorage.getItem(LS));if(d&&d.setting
   if(typeof d.roles[0]==='string')d.roles=d.roles.map(roleFromName);
   d.roles.forEach(r=>{if(!r.perms)r.perms=roleFromName(r.name).perms;});
   d.staff=d.staff||JSON.parse(JSON.stringify(defaults.staff));
-  d.channels=d.channels||JSON.parse(JSON.stringify(defaults.channels));if(d.settings.logo===undefined)d.settings.logo='';if(!d.settings.endOfDay)d.settings.endOfDay='12:00 AM';
+  d.channels=d.channels||JSON.parse(JSON.stringify(defaults.channels));if(d.settings.logo===undefined)d.settings.logo='';if(d.settings.brandText===undefined)d.settings.brandText='POS';if(!d.settings.endOfDay)d.settings.endOfDay='12:00 AM';
   d.customers=d.customers||[];
   return d;}}catch(e){}return JSON.parse(JSON.stringify(defaults));}
 function save(){localStorage.setItem(LS,JSON.stringify(db));}
@@ -1031,9 +1031,18 @@ document.getElementById('setupBack').onclick=renderSetupHub;
 function flash(){const m=document.getElementById('savedMsg');m.textContent='✓ Saved';setTimeout(()=>m.textContent='',1800);}
 function saveAll(){save();flash();refreshChrome();}
 function pProfile(b){const s=db.settings;
-  b.innerHTML=`<div class="card"><div class="two"><div class="field"><label>Business name (English)</label><input id="p_name" value="${esc(s.name)}"></div><div class="field"><label>Business name (Arabic)</label><input id="p_nameAr" dir="rtl" value="${esc(s.nameAr||'')}"></div></div><div class="field"><label>Address</label><input id="p_addr" value="${esc(s.addr)}"></div><div class="two"><div class="field"><label>TRN</label><input id="p_trn" maxlength="15" value="${esc(s.trn)}"></div><div class="field"><label>Phone</label><input id="p_phone" value="${esc(s.phone)}"></div></div><div class="two"><div class="field"><label>Currency</label><input id="p_curr" value="${esc(s.curr)}"></div><div class="field"><label>Invoice prefix</label><input id="p_prefix" value="${esc(s.prefix)}"></div></div><div class="two"><div class="field"><label>End of business day</label><input id="p_eod" value="${esc(s.endOfDay||'')}"></div><div class="field"><label>Logo (shows on receipt)</label><input id="p_logo" type="file" accept="image/*"></div></div><button class="saveBtn" id="p_save">Save</button></div>`;
-  document.getElementById('p_logo').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{db.settings.logo=rd.result;save();flash();};rd.readAsDataURL(f);};
-  document.getElementById('p_save').onclick=()=>{const g=id=>document.getElementById(id).value;Object.assign(db.settings,{name:g('p_name'),nameAr:g('p_nameAr'),addr:g('p_addr'),trn:g('p_trn'),phone:g('p_phone'),curr:g('p_curr')||'AED',prefix:g('p_prefix'),endOfDay:g('p_eod')});saveAll();};
+  b.innerHTML=`<div class="card"><div class="two"><div class="field"><label>Business name (English)</label><input id="p_name" value="${esc(s.name)}"></div><div class="field"><label>Business name (Arabic)</label><input id="p_nameAr" dir="rtl" value="${esc(s.nameAr||'')}"></div></div><div class="field"><label>Address</label><input id="p_addr" value="${esc(s.addr)}"></div><div class="two"><div class="field"><label>TRN</label><input id="p_trn" maxlength="15" value="${esc(s.trn)}"></div><div class="field"><label>Phone</label><input id="p_phone" value="${esc(s.phone)}"></div></div><div class="two"><div class="field"><label>Currency</label><input id="p_curr" value="${esc(s.curr)}"></div><div class="field"><label>Invoice prefix</label><input id="p_prefix" value="${esc(s.prefix)}"></div></div><div class="two"><div class="field"><label>End of business day</label><input id="p_eod" value="${esc(s.endOfDay||'')}"></div><div class="field"><label>Top-left label (leave blank to hide)</label><input id="p_brand" value="${esc(s.brandText===undefined?'POS':s.brandText)}" placeholder="e.g. your brand name"></div></div><div class="two"><div class="field"><label>Logo (top-left & receipt)</label><input id="p_logo" type="file" accept="image/*"></div><div class="field"><label>&nbsp;</label><button class="miniBtn" id="p_logoRemove" type="button">Remove logo</button></div></div><button class="saveBtn" id="p_save">Save</button></div>`;
+  document.getElementById('p_logo').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();
+    rd.onload=()=>{const img=new Image();
+      img.onload=()=>{const MAX=256;let w=img.width,h=img.height;
+        if(w>=h){if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}}else{if(h>MAX){w=Math.round(w*MAX/h);h=MAX;}}
+        let out;try{const cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(img,0,0,w,h);out=cv.toDataURL('image/png');}catch(_){out=rd.result;}
+        db.settings.logo=out;save();flash();refreshChrome();};
+      img.onerror=()=>{db.settings.logo=rd.result;save();flash();refreshChrome();};
+      img.src=rd.result;};
+    rd.readAsDataURL(f);};
+  document.getElementById('p_logoRemove').onclick=()=>{db.settings.logo='';save();flash();refreshChrome();};
+  document.getElementById('p_save').onclick=()=>{const g=id=>document.getElementById(id).value;Object.assign(db.settings,{name:g('p_name'),nameAr:g('p_nameAr'),addr:g('p_addr'),trn:g('p_trn'),phone:g('p_phone'),curr:g('p_curr')||'AED',prefix:g('p_prefix'),endOfDay:g('p_eod'),brandText:g('p_brand')});saveAll();};
 }
 function pTaxes(b){const s=db.settings;
   b.innerHTML=`<div class="card"><div class="three"><div class="field"><label>VAT rate (%)</label><input id="t_vat" type="number" step="0.1" value="${s.vat}"><span class="hint">UAE standard 5%.</span></div><div class="field"><label>Service charge (%)</label><input id="t_svc" type="number" step="0.1" value="${s.service}"></div><div class="field"><label>Municipality fee (%)</label><input id="t_muni" type="number" step="0.1" value="${s.muni}"></div></div><button class="saveBtn" id="t_save">Save</button></div>`;
@@ -1212,6 +1221,9 @@ function refreshChrome(){
   document.getElementById('appTitle').textContent=db.settings.name||'Restaurant POS';
   document.getElementById('bizLabel').textContent='TRN '+db.settings.trn;
   document.title=(db.settings.name||'Restaurant')+' — POS';
+  const bb=document.getElementById('brandBox');
+  if(bb){const logo=db.settings.logo;const bt=(db.settings.brandText===undefined?'POS':db.settings.brandText);
+    bb.innerHTML=(logo?('<span class="dot" style="background:#fff;padding:2px"><img src="'+logo+'" alt="logo" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:6px"></span>'):'<span class="dot">🍽</span>')+(bt?('<span>'+esc(bt)+'</span>'):'');}
   renderCashierSel();applyLang();refreshActive();
 }
 function tickClock(){const d=new Date();document.getElementById('clock').innerHTML=d.toLocaleDateString(lang==='ar'?'ar-AE':'en-GB',{weekday:'short',day:'2-digit',month:'short'})+' · '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}
