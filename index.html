@@ -357,7 +357,9 @@ td.num,th.num{text-align:right}
       <div id="customers" class="view"><div class="pane">
         <h2 data-i18n="crm_title">Customers (CRM)</h2>
         <p class="sub" data-i18n="crm_sub">Everyone who gave a phone number on a takeaway or delivery order.</p>
-        <div class="reportBar"><input id="custSearch" placeholder="🔍 Search name or phone" style="min-width:260px"></div>
+        <div class="reportBar"><input id="custSearch" placeholder="🔍 Search name or phone" style="min-width:260px">
+          <button class="saveBtn" id="custExport" style="margin-left:auto">⬇ Export customers (CSV)</button>
+          <label class="saveBtn" style="cursor:pointer;background:var(--brand)">⬆ Import customers (CSV)<input type="file" id="custImport" accept=".csv,text/csv" style="display:none"></label></div>
         <div class="card"><table id="crmTable"></table></div>
       </div></div>
       <!-- REPORTS -->
@@ -544,6 +546,7 @@ function load(){try{const d=JSON.parse(localStorage.getItem(LS));if(d&&d.setting
   d.roles.forEach(r=>{if(!r.perms)r.perms=roleFromName(r.name).perms;});
   d.staff=d.staff||JSON.parse(JSON.stringify(defaults.staff));
   d.channels=d.channels||JSON.parse(JSON.stringify(defaults.channels));if(d.settings.logo===undefined)d.settings.logo='';if(!d.settings.endOfDay)d.settings.endOfDay='12:00 AM';
+  d.customers=d.customers||[];
   return d;}}catch(e){}return JSON.parse(JSON.stringify(defaults));}
 function save(){localStorage.setItem(LS,JSON.stringify(db));}
 let lang=db.settings.lang||'en';
@@ -876,7 +879,9 @@ function renderDash(){
 }
 /* Customers CRM */
 function crmData(){
-  const cm={};db.txns.forEach(t=>{if(t.custPhone&&!t.void){const k=t.custPhone;cm[k]=cm[k]||{name:'',visits:0,spend:0,last:''};cm[k].visits++;cm[k].spend+=t.total;if(t.custName)cm[k].name=t.custName;if(t.ts>cm[k].last)cm[k].last=t.ts;}});
+  const cm={};
+  (db.customers||[]).forEach(c=>{if(c&&c.phone){const k=String(c.phone);cm[k]={name:c.name||'',visits:+c.visits||0,spend:+c.spend||0,last:c.last||''};}});
+  db.txns.forEach(t=>{if(t.custPhone&&!t.void){const k=t.custPhone;cm[k]=cm[k]||{name:'',visits:0,spend:0,last:''};cm[k].visits++;cm[k].spend+=t.total;if(t.custName)cm[k].name=t.custName;if(t.ts>cm[k].last)cm[k].last=t.ts;}});
   return Object.entries(cm).map(([ph,v])=>({phone:ph,...v})).sort((a,b)=>b.spend-a.spend);
 }
 function renderCustomers(){
@@ -886,6 +891,48 @@ function renderCustomers(){
     (rows.length?rows.map(c=>`<tr><td>${esc(c.name||'-')}</td><td>${esc(c.phone)}</td><td class="num">${c.visits}</td><td class="num">${num(c.spend)}</td><td class="num">${Math.floor(c.spend)}</td><td>${c.last?new Date(c.last).toLocaleDateString('en-GB'):'-'}</td></tr>`).join(''):'<tr><td colspan="6" class="empty">No customers captured yet. Add a phone number on takeaway/delivery orders.</td></tr>');
 }
 document.getElementById('custSearch').oninput=renderCustomers;
+document.getElementById('custExport').onclick=()=>{
+  const rows=crmData();
+  let csv='Name,Phone,Visits,Total spend,Last visit\n';
+  rows.forEach(c=>{csv+=[csvq(c.name||''),csvq(c.phone),(+c.visits||0),(+c.spend||0).toFixed(2),(c.last?new Date(c.last).toISOString().slice(0,10):'')].join(',')+'\n';});
+  download(csv,'text/csv','customers.csv');flash&&flash('Customers exported');
+};
+document.getElementById('custImport').onchange=(e)=>{
+  const f=e.target.files[0];if(!f)return;const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const rows=parseCSV(rd.result);
+      if(!rows.length){alert('That file looks empty.');return;}
+      let start=0,iN=0,iP=1,iV=2,iS=3,iL=4;
+      const h=rows[0].map(x=>String(x).toLowerCase());
+      if(h.some(x=>x.includes('phone')||x.includes('name')||x.includes('mobile'))){
+        start=1;
+        iN=h.findIndex(x=>x.includes('name'));
+        iP=h.findIndex(x=>x.includes('phone')||x.includes('mobile'));
+        iV=h.findIndex(x=>x.includes('visit')&&!x.includes('last'));
+        iS=h.findIndex(x=>x.includes('spend')||x.includes('total'));
+        iL=h.findIndex(x=>x.includes('last')||x.includes('date'));
+      }
+      const g=(r,i)=>(i>=0&&r[i]!=null)?String(r[i]).trim():'';
+      const items=[];
+      for(let k=start;k<rows.length;k++){
+        const r=rows[k];const ph=g(r,iP>=0?iP:1).replace(/\s+/g,'');
+        if(!ph)continue;
+        items.push({name:g(r,iN),phone:ph,visits:parseInt(g(r,iV))||0,spend:parseFloat(g(r,iS))||0,last:g(r,iL)});
+      }
+      if(!items.length){alert('No customers with a phone number were found in that file.');return;}
+      const replace=confirm('Import '+items.length+' customers.\n\nOK = REPLACE the imported customer list\nCancel = ADD to it');
+      const cur=replace?[]:(db.customers||[]).slice();
+      const byPhone={};cur.forEach(c=>{if(c.phone)byPhone[c.phone]=c;});
+      items.forEach(c=>{byPhone[c.phone]=c;});
+      db.customers=Object.values(byPhone);
+      save();renderCustomers();
+      alert('Imported '+items.length+' customers.');
+    }catch(err){alert('Could not read that file — it may not be a valid CSV.');}
+    e.target.value='';
+  };
+  rd.readAsText(f);
+};
 /* Reports */
 let repFilter='date';
 function repTxns(){if(repFilter==='all')return db.txns;const dstr=document.getElementById('repDate').value;return db.txns.filter(t=>t.ts.slice(0,10)===dstr);}
